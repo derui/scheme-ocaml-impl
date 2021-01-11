@@ -1,0 +1,6 @@
+
+(executable
+ (name math_repl)
+ (public_name math_repl)
+ (flags (:standard -safe-string))
+ (libraries ocaml_scheme))

@@ -18,18 +18,7 @@ rule token = parse
   | whitespace+ { token lexbuf }
   | left_paren { LEFT_PAREN }
   | right_paren { RIGHT_PAREN }
-  | symbol_first {symbol (Lexing.lexeme lexbuf) lexbuf}
-  | numeric {number (Lexing.lexeme lexbuf) lexbuf}
-  | eof {EOF}
-
-and symbol first_char = parse
-                      | symbol_rest+ {
-  SYMBOL (first_char ^ (Lexing.lexeme lexbuf) )
-}
-                      | _ {SYMBOL first_char}
+  | symbol_first symbol_rest* {SYMBOL (Lexing.lexeme lexbuf)}
 (* this number lexer supports only little subset of Schema's number *)
-and number first_char = parse
-                      | numeric+ {
-                          NUMBER (first_char ^ (Lexing.lexeme lexbuf) )
-                        }
-                      | _ {NUMBER first_char}
+  | numeric+ {NUMBER (Lexing.lexeme lexbuf)}
+  | eof {EOF}
