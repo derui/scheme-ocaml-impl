@@ -5,8 +5,8 @@
 %token <string> SYMBOL
 %token <string> NUMBER
 %token EOF LEFT_PAREN RIGHT_PAREN
-%type <term list> program
-%type <term> exp
+%type <data list> program
+%type <data> exp
 %start program
 
 %%
@@ -22,5 +22,8 @@ exp:
   | scheme_list { $1 }
 
 scheme_list:
-  | LEFT_PAREN RIGHT_PAREN { Empty_list }
-  | LEFT_PAREN exp+ RIGHT_PAREN { List $2 }
+  | LEFT_PAREN scheme_list_body { $2 }
+
+scheme_list_body:
+  | RIGHT_PAREN { Empty_list }
+  | exp scheme_list_body { Cons ($1, $2) }
