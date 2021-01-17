@@ -23,7 +23,7 @@ let is_primitive = function S.Number _ | S.True | S.False -> true | _ -> false
 
 let eval_primitive v = Ok v
 
-let is_special_form = function "define" -> true | _ -> false
+let is_special_form = function "define" | "if" | "set!" -> true | _ -> false
 
 let rec eval = function
   | Syntax.Symbol sym -> eval_symbol sym
@@ -34,7 +34,16 @@ let rec eval = function
 
 and eval_special_form = function
   | S.Cons (S.Symbol name, S.Cons (S.Symbol sym, v)) when name = "define" -> eval_define sym v
+  | S.Cons (S.Symbol name, v) when name = "if" -> eval_if v
+  | S.Cons (S.Symbol name, S.Cons (S.Symbol sym, v)) when name = "set!" -> eval_set_force sym v
   | _ as v -> Error (Printf.sprintf "Can not handle special form: %s\n" @@ S.Data.to_string v)
+
+and eval_if = function
+  | S.Cons (cond, S.Cons (when_true, S.Cons (when_false, S.Empty_list))) -> (
+      let open Lib.Result.Let_syntax in
+      let* cond = eval cond in
+      match cond with S.False -> eval when_false | _ -> eval when_true )
+  | _ as v -> Error (Printf.sprintf "Invalid syntax %s\n" @@ S.Data.to_string v)
 
 and eval_define sym v =
   let open Lib.Result.Let_syntax in
@@ -42,6 +51,16 @@ and eval_define sym v =
   let* value = eval v in
   Env.set sym value;
   Result.ok value
+
+and eval_set_force sym v =
+  let open Lib.Result.Let_syntax in
+  let* v = match v with Syntax.Cons (v, _) -> Ok v | _ -> Error "Invalid syntax" in
+  let* value = eval v in
+
+  if Env.get sym |> Option.is_none then Error (Printf.sprintf "%s is not defined" sym)
+  else (
+    Env.set sym value;
+    Result.ok value )
 
 and eval_list v =
   let open Lib.Result.Let_syntax in
