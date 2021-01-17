@@ -12,7 +12,7 @@ type data =
   | Empty_list
   | Native_fun of native_fun
 
-and native_fun = number_of_args * (data list -> data)
+and native_fun = number_of_args option * (data -> data)
 
 module Data = struct
   type t = data
