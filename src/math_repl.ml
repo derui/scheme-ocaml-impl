@@ -16,30 +16,29 @@ end
 
 let eval_symbol sym =
   match Env.get sym with
-  | None   -> Result.error @@ Printf.sprintf "symbol %s is not defined in environment" sym
+  | None   -> Result.error @@ Printf.sprintf "symbol %s is not defined in environment\n" sym
   | Some v -> Ok v
 
 let is_primitive = function S.Number _ | S.True | S.False -> true | _ -> false
 
 let eval_primitive v = Ok v
 
-let is_special_form = function
-  | S.Cons (S.Symbol sym, _) -> ( match sym with "define" -> true | _ -> false )
-  | _                        -> false
+let is_special_form = function "define" -> true | _ -> false
 
 let rec eval = function
   | Syntax.Symbol sym -> eval_symbol sym
   | _ as v when is_primitive v -> eval_primitive v
-  | _ as v when is_special_form v -> eval_special_form v
+  | Syntax.Cons (Syntax.Symbol sym, _) as v when is_special_form sym -> eval_special_form v
   | Syntax.Cons (Syntax.Symbol sym, cdr) -> eval_apply sym @@ eval_list cdr
   | _ as v -> Error (Printf.sprintf "Can not handle expression now... %s\n" @@ Syntax.Data.to_string v)
 
 and eval_special_form = function
   | S.Cons (S.Symbol name, S.Cons (S.Symbol sym, v)) when name = "define" -> eval_define sym v
-  | _ as v -> Error (Printf.sprintf "Can not handle special form: %s" @@ S.Data.to_string v)
+  | _ as v -> Error (Printf.sprintf "Can not handle special form: %s\n" @@ S.Data.to_string v)
 
 and eval_define sym v =
   let open Lib.Result.Let_syntax in
+  let* v = match v with Syntax.Cons (v, _) -> Ok v | _ -> Error "Invalid syntax" in
   let* value = eval v in
   Env.set sym value;
   Result.ok value
