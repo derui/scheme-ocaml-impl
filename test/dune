@@ -1,0 +1,3 @@
+(test
+ (name ocaml_scheme_test)
+ (libraries ocaml_scheme alcotest))

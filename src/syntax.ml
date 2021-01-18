@@ -1,7 +1,6 @@
-(* internal representation for lambda and OCaml's function *)
 type number_of_args = int
-(** The syntax of scheme *)
 
+(** The syntax of scheme *)
 type data =
   | Symbol     of string
   | Number     of string
