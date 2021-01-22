@@ -16,16 +16,13 @@ let run () =
   let env = Environment.make [] in
   initialize_global_env env;
   let rec run' env () =
+    let open Lib.Result in
     print_string "repl> ";
-    let command = read_line () in
-    match command with
-    | "halt" -> ()
-    | _      -> (
-        try
-          let terms = Lexing.from_string command |> Parser.program Lexer.token in
-          List.iter (fun term -> Eval.eval env term |> print) terms |> run' env
-        with Parser.Error ->
-          Printexc.print_backtrace stdout;
-          run' env () )
+    try
+      let v = Read.read env S.Empty_list >>= Eval.eval env in
+      print v |> run' env
+    with Parser.Error ->
+      Printexc.print_backtrace stdout;
+      run' env ()
   in
   run' env ()
