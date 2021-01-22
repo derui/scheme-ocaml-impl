@@ -1,7 +1,7 @@
 module S = Syntax
 module E = Environment
 
-let is_primitive = function S.Number _ | S.True | S.False -> true | _ -> false
+let is_primitive = function S.Number _ | S.True | S.False | S.Empty_list -> true | _ -> false
 
 let eval_symbol env sym =
   match E.get env ~key:sym with
