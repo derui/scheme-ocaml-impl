@@ -41,3 +41,7 @@ module Data = struct
     | Native_fun _  -> "<#proc ...>"
     | Closure _     -> "<#closure ...>"
 end
+
+let data_show = Data.to_string
+
+let data_pp fmt v = Format.fprintf fmt "%s" @@ data_show v

@@ -1,6 +1,8 @@
 module E = Ocaml_scheme.Environment
 module S = Ocaml_scheme.Syntax
 
+let data = Alcotest.testable S.data_pp ( = )
+
 let tests =
   [
     Alcotest.test_case "should create empty environment" `Quick (fun () ->
@@ -18,7 +20,7 @@ let tests =
         let value = S.Number "10" in
         let new_value = S.Symbol "sym" in
         let env = E.make [ ("key", value) ] in
-        E.set env ~key:"key" ~v:new_value |> ignore;
+        E.set env ~key:"key" ~v:new_value;
         let actual = E.get env ~key:"key" in
         let expected = Some new_value in
         Alcotest.(check @@ option (of_pp Fmt.nop)) "set value" actual expected);
@@ -34,10 +36,10 @@ let tests =
         let new_value = S.Symbol "sym" in
         let parent_env = E.make [ ("key", value) ] in
         let env = E.make ~parent_env [] in
-        E.set env ~key:"key" ~v:new_value |> ignore;
+        E.replace env ~key:"key" ~v:new_value |> ignore;
         let actual = E.get parent_env ~key:"key" in
         let expected = Some new_value in
-        Alcotest.(check @@ option (of_pp Fmt.nop)) "set value in parent" actual expected);
+        Alcotest.(check @@ option data) "set value in parent" actual expected);
     Alcotest.test_case "should shadow value bounded by same symbol in parent and current environments" `Quick (fun () ->
         let value = S.Number "10" in
         let value_current = S.Number "11" in
@@ -55,4 +57,10 @@ let tests =
         let in_parent = E.get parent_env ~key:"key" and in_current = E.get env ~key:"key" in
         Alcotest.(check @@ option (of_pp Fmt.nop)) "in parent" in_parent (Some value);
         Alcotest.(check @@ option (of_pp Fmt.nop)) "in current" in_current (Some new_value));
+    Alcotest.test_case "should return error if symbol is not defined" `Quick (fun () ->
+        let value = S.Number "10" in
+        let env = E.make [] in
+        E.replace env ~key:"key" ~v:value |> ignore;
+        let actual = E.get env ~key:"key" in
+        Alcotest.(check @@ option data) "in current" actual None);
   ]
