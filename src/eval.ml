@@ -14,7 +14,7 @@ let rec eval env = function
   | Syntax.Symbol sym -> eval_symbol env sym
   | _ as v when is_primitive v -> eval_primitive env v
   | Syntax.Cons (_, _) as v -> eval_list env v
-  | _ as v -> Error (Printf.sprintf "Can not handle expression now... %s\n" @@ Syntax.Data.to_string v)
+  | _ as v -> S.raise_error (Printf.sprintf "Can not handle expression now... %s" @@ Syntax.Data.to_string v)
 
 and eval_list env v =
   let open Lib.Result.Let_syntax in

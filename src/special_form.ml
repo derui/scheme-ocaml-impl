@@ -3,7 +3,11 @@ module S = Syntax
 
 let eval_define env v =
   let open Lib.Result.Let_syntax in
-  let* sym, v = match v with Syntax.Cons (Syntax.Symbol sym, v) -> Ok (sym, v) | _ -> Error "Invalid syntax" in
+  let* sym, v =
+    match v with
+    | Syntax.Cons (Syntax.Symbol sym, S.Cons (v, S.Empty_list)) -> Ok (sym, v)
+    | _ -> Error "Invalid syntax"
+  in
   let* value = Eval.eval env v in
   E.set env ~key:sym ~v:(S.Value value);
   Result.ok value
