@@ -1,7 +1,12 @@
-(* internal representation for lambda and OCaml's function *)
 type number_of_args = int
-(** The syntax of scheme *)
 
+type scheme_error = string
+
+type 'a evaluation_result = ('a, scheme_error) result
+
+let raise_error error = Error error
+
+(** The syntax of scheme *)
 type data =
   | Symbol     of string
   | Number     of string
@@ -10,14 +15,21 @@ type data =
   | False
   (* Empty list should be specialized. *)
   | Empty_list
-  | Native_fun of native_fun
+  | Closure    of lambda
+  | Native_fun of lambda
 
-and native_fun = number_of_args option * (data -> data)
+and lambda = number_of_args option * (env -> data -> data evaluation_result)
+
+and env = binding Environment.t
+
+and binding =
+  | Value        of data
+  | Special_form of lambda
 
 module Data = struct
   type t = data
 
-  let is_applicable = function Native_fun _ -> true | _ -> false
+  let is_applicable = function Native_fun _ | Closure _ -> true | _ -> false
 
   let rec to_string = function
     | Symbol s      -> s
@@ -27,7 +39,5 @@ module Data = struct
     | False         -> "#f"
     | Empty_list    -> "()"
     | Native_fun _  -> "<#proc ...>"
+    | Closure _     -> "<#closure ...>"
 end
-
-(* A simple environment definition *)
-type env = (string * data) list
