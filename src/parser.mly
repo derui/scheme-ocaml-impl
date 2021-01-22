@@ -4,7 +4,7 @@
 
 %token <string> SYMBOL
 %token <string> NUMBER
-%token EOF LEFT_PAREN RIGHT_PAREN
+%token EOF LEFT_PAREN RIGHT_PAREN BOOL_TRUE BOOL_FALSE
 %type <data list> program
 %type <data> exp
 %start program
@@ -19,6 +19,8 @@ program:
 exp:
   | SYMBOL { Symbol $1}
   | NUMBER { Number $1 }
+  | BOOL_FALSE { False }
+  | BOOL_TRUE { True }
   | scheme_list { $1 }
 
 scheme_list:
