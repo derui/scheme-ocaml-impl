@@ -2,17 +2,17 @@ module S = Syntax
 (** This module provides subset of standard operations. *)
 
 module List_op = struct
-  let car _ arg = match arg with S.Cons (S.Cons (v, _), _) -> Ok v | _ -> S.raise_error "pair requirement"
+  let car arg = match arg with S.Cons (S.Cons (v, _), _) -> Ok v | _ -> S.raise_error "pair requirement"
 
-  let cdr _ arg = match arg with S.Cons (S.Cons (_, v), _) -> Ok v | _ -> S.raise_error "pair requirement"
+  let cdr arg = match arg with S.Cons (S.Cons (_, v), _) -> Ok v | _ -> S.raise_error "pair requirement"
 
-  let length env arg =
+  let length arg =
     let open Lib.Result.Let_syntax in
-    let* arg = car env arg in
+    let* arg = car arg in
     let len = Internal_lib.length_of_list arg in
     S.Number (string_of_int len) |> Result.ok
 
-  let reverse _ arg =
+  let reverse arg =
     let rec reverse' accum = function
       | S.Empty_list     -> Ok accum
       | S.Cons (v, rest) -> reverse' (S.Cons (v, accum)) rest
@@ -21,18 +21,18 @@ module List_op = struct
     reverse' S.Empty_list arg
 
   module Export = struct
-    let length = (Some 1, length)
+    let length = (S.Fixed [ "list" ], length)
 
-    let car = (Some 1, car)
+    let car = (S.Fixed [ "list" ], car)
 
-    let cdr = (Some 1, cdr)
+    let cdr = (S.Fixed [ "list" ], cdr)
 
-    let reverse = (Some 1, reverse)
+    let reverse = (S.Fixed [ "list" ], reverse)
   end
 end
 
 module Number_op = struct
-  let plus _ args =
+  let plus args =
     let open Lib.Result.Let_syntax in
     let rec plus' accum v =
       match v with
@@ -48,7 +48,7 @@ module Number_op = struct
     S.Number (string_of_int result) |> Result.ok
 
   module Export = struct
-    let plus = (None, plus)
+    let plus = (S.Any "numbers", plus)
   end
 end
 

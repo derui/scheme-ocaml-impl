@@ -66,12 +66,37 @@ let eval_let env v =
   let new_env = E.make ~parent_env:env bindings in
   eval_sequence new_env body
 
+let eval_lambda env v =
+  let open Lib.Result.Let_syntax in
+  match v with
+  | S.Cons (S.Symbol sym, body) -> Ok (S.Closure { env; argument_formal = S.Any sym; body })
+  | S.Cons (bindings, body)     ->
+      let rec get_argument_symbols symbols rest =
+        match rest with
+        | S.Empty_list                -> List.rev symbols |> (fun v -> (v, None)) |> Result.ok
+        | S.Symbol sym                -> List.rev symbols |> (fun v -> (v, Some sym)) |> Result.ok
+        | S.Cons (S.Symbol sym, rest) -> get_argument_symbols (sym :: symbols) rest
+        | _                           -> S.raise_error
+                                         @@ Printf.sprintf "Syntax error: malformed let: %s"
+                                         @@ S.Data.to_string v
+      in
+      let* arguments, rest_variable = get_argument_symbols [] bindings in
+      let argument_formal =
+        match rest_variable with None -> S.Fixed arguments | Some sym -> S.Fixed_and_any (arguments, sym)
+      in
+      Ok (S.Closure { env; argument_formal; body })
+  | _                           -> S.raise_error
+                                   @@ Printf.sprintf "Syntax error: need argument list: %s"
+                                   @@ S.Data.to_string v
+
 module Export = struct
-  let eval_define = (Some 2, eval_define)
+  let eval_define = eval_define
 
-  let eval_if = (Some 3, eval_if)
+  let eval_if = eval_if
 
-  let eval_set_force = (Some 2, eval_set_force)
+  let eval_set_force = eval_set_force
 
-  let eval_let = (Some 2, eval_let)
+  let eval_let = eval_let
+
+  let eval_lambda = eval_lambda
 end
