@@ -1,7 +1,7 @@
 module S = Ocaml_scheme.Syntax
 module E = Ocaml_scheme.Environment
 module Eval = Ocaml_scheme.Eval
-module B = Ocaml_scheme.Buildin_op
+module P = Ocaml_scheme.Primitive_op
 
 let data = Alcotest.testable S.data_pp ( = )
 
@@ -19,7 +19,7 @@ let tests =
         let actual = Eval.eval env S.True in
         Alcotest.(check @@ result data string) "true" actual (Ok S.True));
     Alcotest.test_case "should apply function" `Quick (fun () ->
-        let env = E.make [ ("+", S.Value (S.Native_fun B.Number_op.Export.plus)) ] in
+        let env = E.make [ ("+", S.Value (S.Primitive_fun P.Number_op.Export.plus)) ] in
         let actual =
           Eval.eval env (S.Cons (S.Symbol "+", S.Cons (S.Number "3", S.Cons (S.Number "4", S.Empty_list))))
         in

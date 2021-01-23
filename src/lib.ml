@@ -5,7 +5,9 @@ module Result = struct
 
   let bind v f = match v with Ok v -> f v | Error e -> Error e
 
-  let ( >>= ) = bind
+  module Infix = struct
+    let ( >>= ) = bind
+  end
 
   module Let_syntax = struct
     let ( let* ) = bind
