@@ -5,6 +5,7 @@
 %token <string> SYMBOL
 %token <string> NUMBER
 %token EOF LEFT_PAREN RIGHT_PAREN BOOL_TRUE BOOL_FALSE
+%token QUASIQUOTE QUOTE UNQUOTE
 %type <data list> program
 %type <data> exp
 %start program
@@ -22,6 +23,9 @@ exp:
   | BOOL_FALSE { False }
   | BOOL_TRUE { True }
   | scheme_list { $1 }
+  | QUASIQUOTE exp { Cons (Symbol "quasiquote", Cons ($2, Empty_list)) }
+  | QUOTE exp { Cons (Symbol "quote",Cons ($2, Empty_list)) }
+  | UNQUOTE exp { Cons (Symbol "unquote", Cons ($2, Empty_list)) }
 
 scheme_list:
   | LEFT_PAREN scheme_list_body { $2 }

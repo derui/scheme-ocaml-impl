@@ -14,6 +14,9 @@ let bool_true = '#' 't'
 let special_char = ['!' '$' '%' '&' '*' '+' '-' '.' '/' ':' '<' '=' '>' '?' '@' '^' '_' '~']
 let symbol_first = alphabet | special_char
 let symbol_rest = alphabet | special_char | numeric
+let quasiquote = '`'
+let quote = '\''
+let comma = ','
 
 rule token = parse
   | '\n' {Lexing.new_line lexbuf; token lexbuf}
@@ -22,6 +25,9 @@ rule token = parse
   | right_paren { RIGHT_PAREN }
   | bool_true { BOOL_TRUE }
   | bool_false { BOOL_FALSE }
+  | quasiquote {QUASIQUOTE}
+  | quote {QUOTE}
+  | comma {UNQUOTE}
   | symbol_first symbol_rest* {SYMBOL (Lexing.lexeme lexbuf)}
 (* this number lexer supports only little subset of Schema's number *)
   | numeric+ {NUMBER (Lexing.lexeme lexbuf)}

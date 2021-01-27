@@ -37,4 +37,23 @@ let tests =
           S.Cons (S.Number "1", S.Cons (S.Cons (S.Symbol "a", S.Cons (S.Number "2", S.Empty_list)), S.Empty_list))
         in
         Alcotest.(check @@ data) "symbol" actual expected);
+    Alcotest.test_case "read quasiquote" `Quick (fun () ->
+        let actual = Lexing.from_string "`(1 (a 2))" |> P.program L.token |> List.hd in
+        let expected =
+          S.Cons
+            ( S.Symbol "quasiquote",
+              S.Cons
+                ( S.Cons
+                    (S.Number "1", S.Cons (S.Cons (S.Symbol "a", S.Cons (S.Number "2", S.Empty_list)), S.Empty_list)),
+                  S.Empty_list ) )
+        in
+        Alcotest.(check @@ data) "quasiquote" actual expected);
+    Alcotest.test_case "read unquote" `Quick (fun () ->
+        let actual = Lexing.from_string "`((,a 2))" |> P.program L.token |> List.hd in
+        let expected = Lexing.from_string "(quasiquote (((unquote a) 2)))" |> P.program L.token |> List.hd in
+        Alcotest.(check @@ data) "unquote" actual expected);
+    Alcotest.test_case "read quote" `Quick (fun () ->
+        let actual = Lexing.from_string "'((a 2))" |> P.program L.token |> List.hd in
+        let expected = Lexing.from_string "(quote ((a 2)))" |> P.program L.token |> List.hd in
+        Alcotest.(check @@ data) "unquote" actual expected);
   ]
