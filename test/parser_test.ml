@@ -48,6 +48,10 @@ let tests =
                   S.Empty_list ) )
         in
         Alcotest.(check @@ data) "quasiquote" actual expected);
+    Alcotest.test_case "read quasiquote: empty list" `Quick (fun () ->
+        let actual = Lexing.from_string "`()" |> P.program L.token |> List.hd in
+        let expected = S.Cons (S.Symbol "quasiquote", S.Cons (S.Empty_list, S.Empty_list)) in
+        Alcotest.(check @@ data) "quasiquote" actual expected);
     Alcotest.test_case "read unquote" `Quick (fun () ->
         let actual = Lexing.from_string "`((,a 2))" |> P.program L.token |> List.hd in
         let expected = Lexing.from_string "(quasiquote (((unquote a) 2)))" |> P.program L.token |> List.hd in

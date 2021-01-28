@@ -89,6 +89,34 @@ let eval_lambda env v =
                                    @@ Printf.sprintf "Syntax error: need argument list: %s"
                                    @@ S.Data.to_string v
 
+let eval_quasiquote env v =
+  let open Lib.Result.Let_syntax in
+  (* unwrap first *)
+  match v with
+  | S.Cons (v, S.Empty_list) -> (
+      match v with
+      | S.Cons _ ->
+          let rec eval_quasiquote' accum v =
+            match v with
+            | S.Empty_list -> Primitive_op.List_op.reverse accum
+            | S.Cons ((S.Cons (S.Symbol "unquote", _) as body), rest) ->
+                let* body = Eval.eval env body in
+                eval_quasiquote' (S.Cons (body, accum)) rest
+            | S.Cons (v, rest) -> eval_quasiquote' (S.Cons (v, accum)) rest
+            | _ ->
+                let* accum = Primitive_op.List_op.reverse accum in
+                Ok (S.Cons (accum, v))
+          in
+          eval_quasiquote' S.Empty_list v
+      | _        -> Ok v )
+  | _                        -> S.raise_error @@ Printf.sprintf "Invalid syntax: quasquote: %s" @@ S.Data.to_string v
+
+let eval_unquote env v =
+  (* unwrap first *)
+  match v with
+  | S.Cons (v, S.Empty_list) -> Eval.eval env v
+  | _                        -> S.raise_error @@ Printf.sprintf "Invalid syntax: unquote: %s" @@ S.Data.to_string v
+
 module Export = struct
   let eval_define = eval_define
 
@@ -99,4 +127,8 @@ module Export = struct
   let eval_let = eval_let
 
   let eval_lambda = eval_lambda
+
+  let eval_quasiquote = eval_quasiquote
+
+  let eval_unquote = eval_unquote
 end
