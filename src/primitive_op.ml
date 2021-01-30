@@ -16,7 +16,7 @@ module List_op = struct
     let rec reverse' accum = function
       | S.Empty_list     -> Ok accum
       | S.Cons (v, rest) -> reverse' (S.Cons (v, accum)) rest
-      | _                -> S.raise_error @@ Printf.sprintf "%s is not proper list" @@ S.Data.to_string arg
+      | _                -> S.raise_error @@ Printf.sprintf "%s is not proper list" @@ Printer.print arg
     in
     reverse' S.Empty_list arg
 
@@ -42,7 +42,7 @@ module Number_op = struct
           plus' (accum + v) rest
       | _                         -> S.raise_error
                                      @@ Printf.sprintf "'+ is not implement for that expr is not number %s"
-                                     @@ S.Data.to_string v
+                                     @@ Printer.print v
     in
     let* result = plus' 0 args in
     S.Number (string_of_int result) |> Result.ok

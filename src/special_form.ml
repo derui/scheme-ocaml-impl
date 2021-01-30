@@ -17,7 +17,7 @@ let eval_if env = function
       let open Lib.Result.Let_syntax in
       let* cond = Eval.eval env cond in
       match cond with S.False -> Eval.eval env when_false | _ -> Eval.eval env when_true )
-  | _ as v -> Error (Printf.sprintf "Invalid syntax %s\n" @@ S.Data.to_string v)
+  | _ as v -> Error (Printf.sprintf "Invalid syntax %s\n" @@ Printer.print v)
 
 let eval_set_force env v =
   let open Lib.Result.Let_syntax in
@@ -49,11 +49,11 @@ let eval_let env v =
           | S.Empty_list -> Ok bindings
           | S.Cons (S.Cons (S.Symbol sym, S.Cons (value, S.Empty_list)), rest) ->
               get_bindings ((sym, value) :: bindings) rest
-          | _ -> S.raise_error @@ Printf.sprintf "Syntax error: malformed let: %s" @@ S.Data.to_string v
+          | _ -> S.raise_error @@ Printf.sprintf "Syntax error: malformed let: %s" @@ Printer.print v
         in
         let* bindings = get_bindings [] bindings in
         Ok (bindings, body)
-    | _                       -> S.raise_error @@ Printf.sprintf "Syntax error: need bindings: %s" @@ S.Data.to_string v
+    | _                       -> S.raise_error @@ Printf.sprintf "Syntax error: need bindings: %s" @@ Printer.print v
   in
   let* bindings =
     List.fold_left
@@ -78,7 +78,7 @@ let eval_lambda env v =
         | S.Cons (S.Symbol sym, rest) -> get_argument_symbols (sym :: symbols) rest
         | _                           -> S.raise_error
                                          @@ Printf.sprintf "Syntax error: malformed let: %s"
-                                         @@ S.Data.to_string v
+                                         @@ Printer.print v
       in
       let* arguments, rest_variable = get_argument_symbols [] bindings in
       let argument_formal =
@@ -87,7 +87,7 @@ let eval_lambda env v =
       Ok (S.Closure { env; argument_formal; body })
   | _                           -> S.raise_error
                                    @@ Printf.sprintf "Syntax error: need argument list: %s"
-                                   @@ S.Data.to_string v
+                                   @@ Printer.print v
 
 let eval_quasiquote env v =
   let open Lib.Result.Let_syntax in
@@ -109,13 +109,13 @@ let eval_quasiquote env v =
           in
           eval_quasiquote' S.Empty_list v
       | _        -> Ok v )
-  | _                        -> S.raise_error @@ Printf.sprintf "Invalid syntax: quasiquote: %s" @@ S.Data.to_string v
+  | _                        -> S.raise_error @@ Printf.sprintf "Invalid syntax: quasiquote: %s" @@ Printer.print v
 
 let eval_unquote env v =
   (* unwrap first *)
   match v with
   | S.Cons (v, S.Empty_list) -> Eval.eval env v
-  | _                        -> S.raise_error @@ Printf.sprintf "Invalid syntax: unquote: %s" @@ S.Data.to_string v
+  | _                        -> S.raise_error @@ Printf.sprintf "Invalid syntax: unquote: %s" @@ Printer.print v
 
 let eval_quote _ v =
   let open Lib.Result.Infix in
@@ -132,7 +132,7 @@ let eval_quote _ v =
           in
           eval_quote' S.Empty_list v
       | _        -> Ok v )
-  | _                        -> S.raise_error @@ Printf.sprintf "Invalid syntax: quote: %s" @@ S.Data.to_string v
+  | _                        -> S.raise_error @@ Printf.sprintf "Invalid syntax: quote: %s" @@ Printer.print v
 
 module Export = struct
   let eval_define = eval_define

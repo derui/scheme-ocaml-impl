@@ -4,7 +4,7 @@ module E = Environment
 
 let print = function
   | Error e -> Printf.printf "Error occurred:\n    %s\n" e
-  | Ok v    -> Printf.printf "%s\n" @@ Syntax.Data.to_string v
+  | Ok v    -> Printf.printf "%s\n" @@ Printer.print v
 
 let initialize_global_env env =
   Environment.set env ~key:"+" ~v:(S.Value (S.Primitive_fun Primitive_op.Number_op.Export.plus)) |> ignore;

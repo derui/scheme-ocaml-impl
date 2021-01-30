@@ -1,7 +1,8 @@
 module E = Ocaml_scheme.Environment
 module S = Ocaml_scheme.Syntax
+module Pr = Ocaml_scheme.Printer
 
-let data = Alcotest.testable S.data_pp ( = )
+let data = Alcotest.testable Pr.pp ( = )
 
 let tests =
   [
