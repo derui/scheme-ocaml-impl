@@ -32,4 +32,9 @@ let tests =
     Alcotest.test_case "unquote: eval boolean" `Quick (fun () ->
         let actual = parse_exp "(#f)" |> F.eval_unquote env in
         Alcotest.(check @@ result data string) "unquote" actual (Ok S.False));
+    Alcotest.test_case "quote: quote all" `Quick (fun () ->
+        let actual = parse_exp "((+ 1 2))" |> F.eval_quote env in
+        Alcotest.(check @@ result data string)
+          "unquote" actual
+          (Ok (to_scheme_list [ S.Symbol "+"; S.Number "1"; S.Number "2" ])));
   ]

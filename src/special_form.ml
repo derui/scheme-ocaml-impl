@@ -109,13 +109,30 @@ let eval_quasiquote env v =
           in
           eval_quasiquote' S.Empty_list v
       | _        -> Ok v )
-  | _                        -> S.raise_error @@ Printf.sprintf "Invalid syntax: quasquote: %s" @@ S.Data.to_string v
+  | _                        -> S.raise_error @@ Printf.sprintf "Invalid syntax: quasiquote: %s" @@ S.Data.to_string v
 
 let eval_unquote env v =
   (* unwrap first *)
   match v with
   | S.Cons (v, S.Empty_list) -> Eval.eval env v
   | _                        -> S.raise_error @@ Printf.sprintf "Invalid syntax: unquote: %s" @@ S.Data.to_string v
+
+let eval_quote _ v =
+  let open Lib.Result.Infix in
+  (* unwrap first *)
+  match v with
+  | S.Cons (v, S.Empty_list) -> (
+      match v with
+      | S.Cons _ ->
+          let rec eval_quote' accum v =
+            match v with
+            | S.Empty_list     -> Primitive_op.List_op.reverse accum
+            | S.Cons (v, rest) -> eval_quote' (S.Cons (v, accum)) rest
+            | _                -> Primitive_op.List_op.reverse accum >|= fun accum -> S.Cons (accum, v)
+          in
+          eval_quote' S.Empty_list v
+      | _        -> Ok v )
+  | _                        -> S.raise_error @@ Printf.sprintf "Invalid syntax: quote: %s" @@ S.Data.to_string v
 
 module Export = struct
   let eval_define = eval_define
@@ -131,4 +148,6 @@ module Export = struct
   let eval_quasiquote = eval_quasiquote
 
   let eval_unquote = eval_unquote
+
+  let eval_quote = eval_quote
 end
