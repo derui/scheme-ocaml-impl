@@ -1,9 +1,10 @@
 module P = Ocaml_scheme.Parser
+module Pr = Ocaml_scheme.Printer
 module L = Ocaml_scheme.Lexer
 module S = Ocaml_scheme.Syntax
 module F = Ocaml_scheme.Special_form
 
-let data = Alcotest.testable S.data_pp ( = )
+let data = Alcotest.testable Pr.pp ( = )
 
 let env =
   Ocaml_scheme.Environment.make [ ("+", S.Value (S.Primitive_fun Ocaml_scheme.Primitive_op.Number_op.Export.plus)) ]

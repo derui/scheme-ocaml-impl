@@ -2,8 +2,9 @@ module S = Ocaml_scheme.Syntax
 module E = Ocaml_scheme.Environment
 module Eval = Ocaml_scheme.Eval
 module P = Ocaml_scheme.Primitive_op
+module Pr = Ocaml_scheme.Printer
 
-let data = Alcotest.testable S.data_pp ( = )
+let data = Alcotest.testable Pr.pp ( = )
 
 let tests =
   [

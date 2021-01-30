@@ -1,8 +1,9 @@
 module P = Ocaml_scheme.Parser
+module Pr = Ocaml_scheme.Printer
 module L = Ocaml_scheme.Lexer
 module S = Ocaml_scheme.Syntax
 
-let data = Alcotest.testable S.data_pp ( = )
+let data = Alcotest.testable Pr.pp ( = )
 
 let tests =
   [

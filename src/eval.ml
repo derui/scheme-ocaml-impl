@@ -14,7 +14,7 @@ let rec eval env = function
   | Syntax.Symbol sym -> eval_symbol env sym
   | _ as v when is_primitive v -> eval_primitive env v
   | Syntax.Cons (_, _) as v -> eval_list env v
-  | _ as v -> S.raise_error (Printf.sprintf "Can not handle expression now... %s" @@ Syntax.Data.to_string v)
+  | _ as v -> S.raise_error (Printf.sprintf "Can not handle expression now... %s" @@ Printer.print v)
 
 and eval_sequence env bodies =
   let open Lib.Result.Let_syntax in
@@ -36,7 +36,7 @@ and eval_list env v =
       let* car = eval env car in
       let* arg = eval_list env cdr in
       eval_combo env car arg
-  | _                          -> S.raise_error @@ Printf.sprintf "Invalid syntax: %s" @@ S.Data.to_string v
+  | _                          -> S.raise_error @@ Printf.sprintf "Invalid syntax: %s" @@ Printer.print v
 
 and eval_combo env f arg =
   let open Lib.Result.Let_syntax in
@@ -52,7 +52,7 @@ and eval_combo env f arg =
   let* arg = Primitive_op.List_op.reverse arg in
   match f with
   | Syntax.Primitive_fun _ | Syntax.Closure _ -> eval_apply f arg
-  | _ -> failwith @@ Printf.sprintf "Illegal path: %s" @@ S.Data.to_string arg
+  | _ -> failwith @@ Printf.sprintf "Illegal path: %s" @@ Printer.print arg
 
 and eval_apply closure data =
   let open Lib.Result.Infix in
@@ -92,4 +92,4 @@ and eval_apply closure data =
       let* zipped_arguments = to_binding_arguments argument_formal arguments in
       let env = E.make ~parent_env:env zipped_arguments in
       eval_sequence env body
-  | _ -> S.raise_error @@ Printf.sprintf "need closure: %s" @@ S.Data.to_string closure
+  | _ -> S.raise_error @@ Printf.sprintf "need closure: %s" @@ Printer.print closure

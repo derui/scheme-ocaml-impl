@@ -36,27 +36,6 @@ and binding =
   | Value        of data
   | Special_form of special_form
 
-module Data = struct
-  type t = data
+let is_cons = function Cons _ -> true | _ -> false
 
-  let is_applicable = function Primitive_fun _ | Closure _ -> true | _ -> false
-
-  let rec to_string = function
-    | Symbol s        -> s
-    | Number s        -> s
-    | Cons (v1, v2)   -> Printf.sprintf "(%s . %s)" (to_string v1) (to_string v2)
-    | True            -> "#t"
-    | False           -> "#f"
-    | Empty_list      -> "()"
-    | Primitive_fun _ -> "<#proc ...>"
-    | Closure _       -> "<#closure ...>"
-    | Syntax_fun _    -> "<#syntax ...>"
-
-  let is_cons = function Cons _ -> true | _ -> false
-
-  let rec is_proper_list v = match v with Empty_list -> true | Cons (_, cdr) -> is_proper_list cdr | _ -> false
-end
-
-let data_show = Data.to_string
-
-let data_pp fmt v = Format.fprintf fmt "%s" @@ data_show v
+let rec is_proper_list v = match v with Empty_list -> true | Cons (_, cdr) -> is_proper_list cdr | _ -> false

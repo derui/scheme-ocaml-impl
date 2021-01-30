@@ -11,8 +11,8 @@ let length_of_list arg =
 let validate_arguments formal data =
   match formal with
   | S.Any _                   ->
-      if S.Data.is_proper_list data then Ok data
-      else S.raise_error @@ Printf.sprintf "%s is not proper list" @@ S.Data.to_string data
+      if S.is_proper_list data then Ok data
+      else S.raise_error @@ Printf.sprintf "%s is not proper list" @@ Printer.print data
   | S.Fixed args              ->
       let len = List.length args in
       let arg_len = length_of_list data in
