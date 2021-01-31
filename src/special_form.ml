@@ -128,7 +128,7 @@ let eval_quote _ v =
             match v with
             | S.Empty_list     -> Primitive_op.List_op.reverse accum
             | S.Cons (v, rest) -> eval_quote' (S.Cons (v, accum)) rest
-            | _                -> Primitive_op.List_op.reverse accum >|= fun accum -> S.Cons (accum, v)
+            | _                -> Primitive_op.List_op.reverse accum >>| fun accum -> S.Cons (accum, v)
           in
           eval_quote' S.Empty_list v
       | _        -> Ok v )

@@ -8,7 +8,7 @@ module Result = struct
   module Infix = struct
     let ( >>= ) = bind
 
-    let ( >|= ) v f = Result.map f v
+    let ( >>| ) v f = Result.map f v
   end
 
   module Let_syntax = struct
