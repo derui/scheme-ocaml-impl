@@ -1,5 +1,5 @@
 %{
-    open Syntax
+    open Type
  %}
 
 %token <string> SYMBOL

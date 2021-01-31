@@ -1,4 +1,4 @@
-type t = Syntax.data
+type t = Type.data
 
 val print : t -> string
 (** [print data] get string representation of [data]. If data is constructed from invalid syntax, this function raise
