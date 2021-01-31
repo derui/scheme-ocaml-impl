@@ -11,9 +11,10 @@ let alphabet = ['a'-'z' 'A'-'Z']
 let numeric = ['0'-'9']
 let bool_false = '#' 'f'
 let bool_true = '#' 't'
-let special_char = ['!' '$' '%' '&' '*' '+' '-' '.' '/' ':' '<' '=' '>' '?' '@' '^' '_' '~']
+let dot = '.'
+let special_char = ['!' '$' '%' '&' '*' '+' '-' '/' ':' '<' '=' '>' '?' '@' '^' '_' '~']
 let symbol_first = alphabet | special_char
-let symbol_rest = alphabet | special_char | numeric
+let symbol_rest = alphabet | special_char | dot | numeric
 let quasiquote = '`'
 let quote = '\''
 let comma = ','
@@ -28,7 +29,9 @@ rule token = parse
   | quasiquote {QUASIQUOTE}
   | quote {QUOTE}
   | comma {UNQUOTE}
-  | symbol_first symbol_rest* {SYMBOL (Lexing.lexeme lexbuf)}
+  | dot {DOT}
+  | symbol_first {SYMBOL (Lexing.lexeme lexbuf)}
+  | symbol_first symbol_rest+ {SYMBOL (Lexing.lexeme lexbuf)}
 (* this number lexer supports only little subset of Schema's number *)
   | numeric+ {NUMBER (Lexing.lexeme lexbuf)}
   | eof {EOF}

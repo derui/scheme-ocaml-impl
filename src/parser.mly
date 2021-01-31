@@ -5,7 +5,7 @@
 %token <string> SYMBOL
 %token <string> NUMBER
 %token EOF LEFT_PAREN RIGHT_PAREN BOOL_TRUE BOOL_FALSE
-%token QUASIQUOTE QUOTE UNQUOTE
+%token QUASIQUOTE QUOTE UNQUOTE DOT
 %type <data list> program
 %type <data> exp
 %start program
@@ -33,3 +33,4 @@ scheme_list:
 scheme_list_body:
   | RIGHT_PAREN { Empty_list }
   | exp scheme_list_body { Cons ($1, $2) }
+  | exp DOT exp RIGHT_PAREN { Cons ($1, $3) }
