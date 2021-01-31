@@ -61,4 +61,12 @@ let tests =
         let actual = Lexing.from_string "'((a 2))" |> P.program L.token |> List.hd in
         let expected = Lexing.from_string "(quote ((a 2)))" |> P.program L.token |> List.hd in
         Alcotest.(check @@ data) "unquote" actual expected);
+    Alcotest.test_case "read dotted list" `Quick (fun () ->
+        let actual = Lexing.from_string "(a . 2)" |> P.program L.token |> List.hd in
+        let expected = S.Cons (S.Symbol "a", S.Number "2") in
+        Alcotest.(check @@ data) "unquote" actual expected);
+    Alcotest.test_case "read nested dotted list" `Quick (fun () ->
+        let actual = Lexing.from_string "((a . 1) . 2)" |> P.program L.token |> List.hd in
+        let expected = S.Cons (S.Cons (Symbol "a", S.Number "1"), S.Number "2") in
+        Alcotest.(check @@ data) "unquote" actual expected);
   ]
