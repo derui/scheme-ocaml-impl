@@ -118,7 +118,9 @@ end
 
 type pattern_in_rule = Pattern.t list
 
-module Syntax_rule = struct
+type syntax_rule = pattern_in_rule * Pattern.t
+
+module Syntax_rules = struct
   type t = {
     ellipsis : string;
     literals : string list;
@@ -131,7 +133,7 @@ end
 
 (* This module provide some parser combinator to parse expression by rule *)
 module Pattern_matcher = struct
-  type t = { syntax_rule : Syntax_rule.t }
+  type t = { syntax_rules : Syntax_rules.t }
 end
 
 module Rule_parser = struct
@@ -192,9 +194,11 @@ module Rule_parser = struct
   (* Parsing template is the same rule for pattern. *)
   let template : Pattern.t L.t = pattern
 
-  (* let syntax_rule =
-   *   let open L.Let_syntax in
-   *   let open L.Infix in
-   *   let* pattern = pattern_in_rule <*> list in
-   *   let* template = *)
+  let syntax_rule : syntax_rule L.t =
+    let open L.Let_syntax in
+    let open L.Infix in
+    let* l = list >>= L.car in
+    let* pattern = lift pattern_in_rule l in
+    let* template = template in
+    L.pure (pattern, template)
 end
