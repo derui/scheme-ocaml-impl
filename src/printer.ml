@@ -1,9 +1,9 @@
-module S = Syntax
+module T = Type
 
-type t = S.data
+type t = T.data
 
 let rec to_string = function
-  | S.Symbol s      -> s
+  | T.Symbol s      -> s
   | Number s        -> s
   | Cons _ as v     -> cons_to_string [] v
   | True            -> "#t"

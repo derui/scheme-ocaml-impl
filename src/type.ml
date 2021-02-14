@@ -38,4 +38,24 @@ and binding =
 
 let is_cons = function Cons _ -> true | _ -> false
 
+let is_symbol = function Symbol _ -> true | _ -> false
+
+let is_true = function True -> true | _ -> false
+
+let is_false = function False -> true | _ -> false
+
+let is_number = function Number _ -> true | _ -> false
+
 let rec is_proper_list v = match v with Empty_list -> true | Cons (_, cdr) -> is_proper_list cdr | _ -> false
+
+module Access = struct
+  let symbol_name = function Symbol sym -> Some sym | _ -> None
+end
+
+module Constructor = struct
+  let cons a b = Cons (a, b)
+
+  let symbol b = Symbol b
+
+  let number v = Number v
+end

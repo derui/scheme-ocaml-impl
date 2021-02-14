@@ -5,6 +5,7 @@ let tests =
     ("Parser", Parser_test.tests);
     ("Eval", Eval_test.tests);
     ("Printer", Printer_test.tests);
+    ("Syntax rule library", Syntax_rule_lib_test.tests);
   ]
 
 let () = Alcotest.run "OCaml scheme learning" tests
