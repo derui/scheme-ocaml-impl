@@ -1,20 +1,6 @@
 module T = Type
 module Pr = Printer
 
-type syntax_rule = { symbol_table : (string, string) Hashtbl.t }
-
-type pattern =
-  [ `Symbol     of string
-  | `Nested     of pattern
-  | `Literal    of T.data
-  | `Underscore
-  ]
-
-(* This module provide some parser combinator to parse expression by rule *)
-module Pattern_matcher = struct
-  type t = { syntax_rule : syntax_rule }
-end
-
 (* module to parse scheme's list as data type defined in OCaml. This module define some parser combinator to be used in
    parsing syntax-rule. *)
 module List_parser = struct
@@ -54,13 +40,17 @@ module List_parser = struct
   (* Apply [p1] and [p2] sequentially and use left result *)
   let ( *< ) p p2 = Infix.((fun x _ -> x) <$> p <*> p2)
 
-  let expression = function
+  let element = function
     | T.Empty_list         -> Error "empty list"
-    | Cons (v, Empty_list) -> Ok (v, T.Empty_list)
-    | Cons (v, rest)       -> Ok (v, rest)
-    | _ as v               -> Ok (v, T.Empty_list)
+    | Cons (v, Empty_list) -> Ok (`Car v, T.Empty_list)
+    | Cons (v, rest)       -> Ok (`Car v, rest)
+    | _ as v               -> Ok (`Cdr v, T.Empty_list)
 
   let zero _ = Error "empty"
+
+  let car = function `Car v -> pure v | _ -> zero
+
+  let cdr = function `Cdr v -> pure v | _ -> zero
 
   let choice p q data =
     let p = p data in
@@ -74,7 +64,7 @@ module List_parser = struct
   let ( <|> ) = choice
 
   let satisfy p =
-    let* v = expression in
+    let* v = element in
     if p v then pure v else zero
 
   let many : 'a t -> 'a list t =
@@ -84,8 +74,7 @@ module List_parser = struct
       let* v = p <|> pure [] in
       match v with [] -> List.rev accum |> pure | v :: _ -> many' (v :: accum)
     in
-    let* ps = many' [] <|> pure [] in
-    pure ps
+    many' [] <|> pure []
 
   let many1 p =
     let* p' = p in
@@ -108,4 +97,104 @@ module List_parser = struct
 
   (* chain zero or more repeated operator to result of parser. *)
   let chainl p op a = chainl1 p op <|> pure a
+end
+
+(* module for Pattern and template in rule *)
+module Pattern = struct
+  type t =
+    | Symbol   of string
+    | Nested   of t list
+    | Constant of T.data
+    | Dotted   of t
+
+  let rec show = function
+    | Symbol s   -> Printf.sprintf "sym(%s)" s
+    | Nested v   -> Printf.sprintf "nested(%s)" @@ String.concat "," @@ List.map show v
+    | Constant d -> Printf.sprintf "constant(%s)" @@ Pr.print d
+    | Dotted v   -> Printf.sprintf "dotted(%s)" (show v)
+
+  let pp fmt v = Format.fprintf fmt "%s" @@ show v
+end
+
+type pattern_in_rule = Pattern.t list
+
+module Syntax_rule = struct
+  type t = {
+    ellipsis : string;
+    literals : string list;
+    symbol_table : (string, string) Hashtbl.t;
+    patterns : pattern_in_rule list;
+  }
+
+  let make () = { ellipsis = "..."; literals = []; symbol_table = Hashtbl.create 0; patterns = [] }
+end
+
+(* This module provide some parser combinator to parse expression by rule *)
+module Pattern_matcher = struct
+  type t = { syntax_rule : Syntax_rule.t }
+end
+
+module Rule_parser = struct
+  module L = List_parser
+
+  let any_p p = function `Car v | `Cdr v -> p v
+
+  let any = function `Car v | `Cdr v -> L.pure v
+
+  let symbol = L.satisfy @@ any_p T.is_symbol
+
+  let constant = L.(satisfy @@ any_p T.is_number <|> satisfy @@ any_p T.is_true <|> satisfy @@ any_p T.is_false)
+
+  let list = L.satisfy @@ any_p T.is_cons
+
+  let lift p data = match p data with Ok (v, _) -> fun data -> Ok (v, data) | Error _ -> L.zero
+
+  (* parser for pattern. The definition of pattern is required the parser is recursive, so this parser is recursive and
+     big. *)
+  let rec pattern data =
+    let open L.Let_syntax in
+    let open L.Infix in
+    let pattern_1 data =
+      let p =
+        (function `Car v -> Pattern.Constant v | `Cdr v -> Pattern.(Dotted (Constant v))) <$> L.(symbol <|> constant)
+      in
+      p data
+    in
+    let pattern_2 data =
+      let v =
+        let* l = list >>= L.car in
+        let* nested = lift L.(many @@ pattern) l in
+        L.pure (Pattern.Nested nested)
+      in
+      v data
+    (* pattern (<pattern> <pattern> ... . <pattern>) *)
+    and pattern_3 data =
+      let v =
+        let* l = list >>= L.car in
+        let* patterns =
+          lift
+            (let* v = L.many1 @@ pattern in
+             let* p2 = L.(element >>= cdr >>= lift pattern) in
+             L.pure (v @ [ Pattern.Dotted p2 ]))
+            l
+        in
+        L.pure (Pattern.Nested patterns)
+      in
+      v data
+    in
+    L.(pattern_1 <|> pattern_2 <|> pattern_3) data
+
+  let pattern_in_rule : pattern_in_rule L.t =
+    let open L.Let_syntax in
+    let* v = L.many1 pattern in
+    match v with [] -> L.zero | _ :: rest -> L.pure rest
+
+  (* Parsing template is the same rule for pattern. *)
+  let template : Pattern.t L.t = pattern
+
+  (* let syntax_rule =
+   *   let open L.Let_syntax in
+   *   let open L.Infix in
+   *   let* pattern = pattern_in_rule <*> list in
+   *   let* template = *)
 end
