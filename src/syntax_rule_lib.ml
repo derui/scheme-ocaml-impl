@@ -5,7 +5,7 @@ module Pr = Printer
    parsing syntax-rule. *)
 module List_parser = struct
   (* The type of parser *)
-  type 'a t = T.data -> ('a * T.data, string) result
+  type 'a t = T.data option -> ('a * T.data option, string) result
 
   let map : ('a -> 'b) -> 'a t -> 'b t =
    fun f p data -> match p data with Error _ as v -> v | Ok (v, rest) -> Ok (f v, rest)
@@ -41,12 +41,15 @@ module List_parser = struct
   let ( *< ) p p2 = Infix.((fun x _ -> x) <$> p <*> p2)
 
   let element = function
-    | T.Empty_list         -> Error "empty list"
-    | Cons (v, Empty_list) -> Ok (`Car v, T.Empty_list)
-    | Cons (v, rest)       -> Ok (`Car v, rest)
-    | _ as v               -> Ok (`Cdr v, T.Empty_list)
+    | Some T.Empty_list     -> Error "end of list"
+    | Some (Cons (v, rest)) -> Ok (`Car v, Some rest)
+    | Some v                -> Ok (`Cdr v, None)
+    | None                  -> Error "informal list"
 
-  let zero _ = Error "empty"
+  let zero v =
+    match v with
+    | Some v -> Error (Printf.sprintf "empty: %s" @@ Pr.print v)
+    | None   -> Error (Printf.sprintf "get last of list")
 
   let car = function `Car v -> pure v | _ -> zero
 
@@ -55,13 +58,18 @@ module List_parser = struct
   let choice p q data =
     let p = p data in
     let q = q data in
-    match (p, q) with
-    | Error _, Error _              -> Error "can not choice"
-    | Error _, Ok v | Ok v, Error _ -> Ok v
-    | Ok p, Ok _                    -> Ok p
+    match (p, q) with Error _, Error _ -> Error "can not choice" | Error _, Ok v | Ok v, _ -> Ok v
 
   (* combinator to choice *)
   let ( <|> ) = choice
+
+  let tap f data =
+    let p =
+      let* v = element in
+      f v |> pure
+    in
+    p data |> ignore;
+    Ok ((), data)
 
   let satisfy p =
     let* v = element in
@@ -125,10 +133,19 @@ module Syntax_rules = struct
     ellipsis : string;
     literals : string list;
     symbol_table : (string, string) Hashtbl.t;
-    patterns : pattern_in_rule list;
+    syntax_rules : syntax_rule list;
   }
 
-  let make () = { ellipsis = "..."; literals = []; symbol_table = Hashtbl.create 0; patterns = [] }
+  let make ?(ellipsis = "...") ?(literals = []) ?(syntax_rules = []) () =
+    { ellipsis; literals; symbol_table = Hashtbl.create 0; syntax_rules }
+
+  let show { ellipsis; literals; syntax_rules; _ } =
+    let pattern_in_rule p = Printf.sprintf "(%s)" @@ String.concat "," @@ List.map Pattern.show p in
+    let show_syntax_rules (p, t) = Printf.sprintf "(%s ==> %s)" (pattern_in_rule p) (Pattern.show t) in
+    Printf.sprintf "{ellipsis = %s; literals = %s; syntax_rules = %s}" ellipsis (String.concat "," literals)
+      (String.concat ";" @@ List.map show_syntax_rules syntax_rules)
+
+  let pp fmt v = Format.fprintf fmt "%s" @@ show v
 end
 
 (* This module provide some parser combinator to parse expression by rule *)
@@ -147,7 +164,7 @@ module Rule_parser = struct
 
   let constant = L.(satisfy @@ any_p T.is_number <|> satisfy @@ any_p T.is_true <|> satisfy @@ any_p T.is_false)
 
-  let list = L.satisfy @@ any_p T.is_cons
+  let list = L.satisfy @@ function `Car (T.Cons _) | `Car T.Empty_list -> true | _ -> false
 
   let lift p data = match p data with Ok (v, _) -> fun data -> Ok (v, data) | Error _ -> L.zero
 
@@ -165,7 +182,7 @@ module Rule_parser = struct
     let pattern_2 data =
       let v =
         let* l = list >>= L.car in
-        let* nested = lift L.(many @@ pattern) l in
+        let* nested = lift L.(many @@ pattern) (Some l) in
         L.pure (Pattern.Nested nested)
       in
       v data
@@ -176,9 +193,9 @@ module Rule_parser = struct
         let* patterns =
           lift
             (let* v = L.many1 @@ pattern in
-             let* p2 = L.(element >>= cdr >>= lift pattern) in
+             let* p2 = L.(element >>= cdr >>= fun v -> lift pattern (Some v)) in
              L.pure (v @ [ Pattern.Dotted p2 ]))
-            l
+            (Some l)
         in
         L.pure (Pattern.Nested patterns)
       in
@@ -188,8 +205,9 @@ module Rule_parser = struct
 
   let pattern_in_rule : pattern_in_rule L.t =
     let open L.Let_syntax in
-    let* v = L.many1 pattern in
-    match v with [] -> L.zero | _ :: rest -> L.pure rest
+    let* _ = symbol in
+    let* v = L.many pattern in
+    L.pure v
 
   (* Parsing template is the same rule for pattern. *)
   let template : Pattern.t L.t = pattern
@@ -198,7 +216,34 @@ module Rule_parser = struct
     let open L.Let_syntax in
     let open L.Infix in
     let* l = list >>= L.car in
-    let* pattern = lift pattern_in_rule l in
+    let* pattern = lift pattern_in_rule (Some l) in
     let* template = template in
     L.pure (pattern, template)
+
+  let ellipsis =
+    let open L.Let_syntax in
+    let* symbol = symbol in
+    match symbol with `Car (T.Symbol v) -> L.pure @@ Option.some v | _ -> L.pure None
+
+  let literals =
+    let open L.Let_syntax in
+    let open L.Infix in
+    let* l = list >>= L.car in
+    let p =
+      let* e = L.element >>= L.car in
+      match e with T.Symbol v -> L.pure v | _ -> L.zero
+    in
+    L.(lift (L.many p) (Some l) <|> L.pure [])
+
+  let syntax_rules : Syntax_rules.t L.t =
+    let open L.Let_syntax in
+    let open L.Infix in
+    let* ellipsis = L.(ellipsis <|> L.pure None) in
+    let* literals = literals in
+    let* syntax_rules =
+      L.many1
+      @@ let* l = list >>= L.car in
+         lift syntax_rule (Some l)
+    in
+    Syntax_rules.make ?ellipsis ~literals ~syntax_rules () |> L.pure
 end
