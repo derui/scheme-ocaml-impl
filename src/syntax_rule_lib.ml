@@ -211,17 +211,22 @@ module Pattern_matcher = struct
     | Literal  of string
     | Variable of T.data
 
-  type t = { symbol_table : (string, mapped_type) Hashtbl.t }
+  and t = {
+    symbol_table : (string, mapped_type) Hashtbl.t;
+    level : t list;
+  }
 
-  let make () = { symbol_table = Hashtbl.create 0 }
+  let make () = { symbol_table = Hashtbl.create 0; level = [] }
 
-  let put_literal { symbol_table } key data =
-    Hashtbl.replace symbol_table key (Literal data);
-    { symbol_table }
+  let set_level t level = { t with level }
 
-  let put_pattern_variable { symbol_table } key data =
-    Hashtbl.replace symbol_table key (Variable data);
-    { symbol_table }
+  let put_literal t key data =
+    Hashtbl.replace t.symbol_table key (Literal data);
+    t
+
+  let put_pattern_variable t key data =
+    Hashtbl.replace t.symbol_table key (Variable data);
+    t
 
   let rec is_invalid_pattern literals patterns =
     let symbol_patterns =
@@ -239,14 +244,93 @@ module Pattern_matcher = struct
     let compare = Stdlib.compare
   end)
 
-  let match_pattern pattern datum literal_set t =
+  let rec match_pattern pattern datum literal_set t =
     match (pattern, datum) with
     | Pattern.Symbol v, T.Symbol s when Literal_set.mem v literal_set ->
         if v = s then Some (put_literal t v s) else None
-    | Pattern.Symbol v, (T.Symbol _ as s) -> Some (put_pattern_variable t v s)
+    (* match, but can not use matched value in template *)
+    | Pattern.Symbol v, (_ as s) when v <> "_" -> Some (put_pattern_variable t v s)
+    | Pattern.Symbol v, _ when v = "_" -> Some t
     | Pattern.Constant (T.Number v), T.Number v' when v = v' -> Some t
     | Pattern.Constant T.True, T.True | Pattern.Constant T.False, T.False -> Some t
-    | _ -> failwith "Implementation here"
+    | Pattern.Nest patterns, (T.Cons _ as l) -> match_pattern_list patterns l literal_set t
+    | Pattern.Nest_dot (patterns, dot), (T.Cons _ as l) -> match_pattern_dot_list (patterns, dot) l literal_set t
+    | Pattern.Nest_ellipsis (patterns, ellipsis_pattern, rest_patterns), (T.Cons _ as l) ->
+        match_pattern_ellipsis_list (patterns, ellipsis_pattern, rest_patterns) l literal_set t
+    | Pattern.Nest_ellipsis_dot (patterns, ellipsis_pattern, rest_patterns, dot), (T.Cons _ as l) ->
+        match_pattern_ellipsis_dot_list (patterns, ellipsis_pattern, rest_patterns, dot) l literal_set t
+    | _ -> None
+
+  and match_pattern_list patterns data literal_set t =
+    let open Lib.Option.Let_syntax in
+    match (patterns, data) with
+    | [ v ], T.Cons (v', T.Empty_list) -> match_pattern v v' literal_set t
+    | v :: rest, T.Cons (v', rest')    ->
+        let* _ = match_pattern v v' literal_set t in
+        match_pattern_list rest rest' literal_set t
+    | [], T.Empty_list                 -> Some t
+    | _, _                             -> None
+
+  and match_pattern_dot_list (patterns, dot) data literal_set t =
+    let open Lib.Option.Let_syntax in
+    match (patterns, data) with
+    | [ v ], T.Cons (v', dot')      ->
+        let* _ = match_pattern v v' literal_set t in
+        match_pattern dot dot' literal_set t
+    | v :: rest, T.Cons (v', rest') ->
+        let* _ = match_pattern v v' literal_set t in
+        match_pattern_dot_list (rest, dot) rest' literal_set t
+    | _, _                          -> None
+
+  and match_pattern_ellipsis_list (patterns, ellipsis, rest_patterns) data literal_set t =
+    let open Lib.Option.Let_syntax in
+    let minimum_len = List.length patterns + List.length rest_patterns
+    and list_len = Internal_lib.length_of_list data in
+    let* () = if minimum_len > list_len then None else Some () in
+    let* t = match_pattern_list patterns (Internal_lib.take_list data (List.length patterns)) literal_set t in
+    let ellipsis_count = max 0 @@ (list_len - minimum_len) in
+    let rec match_ellipsis count data patterns =
+      if count = 0 then Some (List.rev patterns)
+      else
+        match data with
+        | T.Cons (v, rest) ->
+            let* t = match_pattern ellipsis v literal_set (make ()) in
+            match_ellipsis (pred count) rest (t :: patterns)
+        | _                -> None
+    in
+    let* ellipsis = match_ellipsis ellipsis_count (Internal_lib.tail_list data @@ List.length patterns) [] in
+    let leveled_t = set_level t ellipsis in
+    let* t =
+      match_pattern_list rest_patterns
+        (Internal_lib.tail_list data (List.length patterns + ellipsis_count))
+        literal_set leveled_t
+    in
+    Some t
+
+  and match_pattern_ellipsis_dot_list (patterns, ellipsis, rest_patterns, dot) data literal_set t =
+    let open Lib.Option.Let_syntax in
+    let minimum_len = List.length patterns + List.length rest_patterns
+    and list_len = Internal_lib.length_of_list data in
+    let* () = if minimum_len > list_len then None else Some () in
+    let* t = match_pattern_list patterns (Internal_lib.take_list data (List.length patterns)) literal_set t in
+    let ellipsis_count = max 0 @@ (list_len - minimum_len) in
+    let rec match_ellipsis count data patterns =
+      if count = 0 then Some (List.rev patterns)
+      else
+        match data with
+        | T.Cons (v, rest) ->
+            let* t = match_pattern ellipsis v literal_set (make ()) in
+            match_ellipsis (pred count) rest (t :: patterns)
+        | _                -> None
+    in
+    let* ellipsis = match_ellipsis ellipsis_count (Internal_lib.tail_list data @@ List.length patterns) [] in
+    let leveled_t = set_level t ellipsis in
+    let* t =
+      match_pattern_dot_list (rest_patterns, dot)
+        (Internal_lib.tail_list data (List.length patterns + ellipsis_count))
+        literal_set leveled_t
+    in
+    Some t
 
   (* Get mapped symbol table from list by the pattern if matched. *)
   let match_rule_pattern ~syntax_rule ~literals _ =
