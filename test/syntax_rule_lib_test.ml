@@ -105,13 +105,13 @@ let pattern_parser_test =
 
 let syntax_rule_parser_test =
   let pattern_p = Alcotest.of_pp S.Pattern.pp in
-  let rule_pp = Alcotest.(result (pair (pair pattern_p pattern_p) exp_pp) string) in
+  let rule_pp = Alcotest.(result (pair (pair pattern_p exp_pp) exp_pp) string) in
   let module P = S.Pattern in
   [
     Alcotest.test_case "Syntax rule Parser: parse the simplest rule" `Quick (fun () ->
         let list = [ list_to_scheme_list [ T.Symbol "a" ]; T.Number "1" ] |> list_to_scheme_list in
         let actual = S.Rule_parser.syntax_rule list in
-        let expected = Ok ((P.Nest [], P.Constant (T.Number "1")), T.Empty_list) in
+        let expected = Ok ((P.Nest [], T.Number "1"), T.Empty_list) in
         Alcotest.(check rule_pp) "simple" expected actual);
     Alcotest.test_case "Syntax rule Parser: parse template contains list" `Quick (fun () ->
         let list =
@@ -121,7 +121,7 @@ let syntax_rule_parser_test =
         let actual = S.Rule_parser.syntax_rule list in
         let expected =
           Ok
-            ( (P.Nest [], P.Nest [ P.Constant (T.Symbol "+"); P.Constant (T.Number "1"); P.Constant (T.Symbol "b") ]),
+            ( (P.Nest [], T.Cons (T.Symbol "+", T.Cons (T.Number "1", T.Cons (T.Symbol "b", T.Empty_list)))),
               T.Empty_list )
         in
         Alcotest.(check rule_pp) "simple" expected actual);
@@ -136,7 +136,7 @@ let syntax_rules_parser_test =
     Alcotest.test_case "Syntax rules Parser: parse the simplest list of syntax-rules" `Quick (fun () ->
         let list = [ list []; list [ list [ T.Symbol "s" ]; T.Number "1" ] ] |> list in
         let actual = S.Rule_parser.syntax_rules list in
-        let rule = (P.Nest [], P.Constant (T.Number "1")) in
+        let rule = (P.Nest [], T.Number "1") in
         let expected = Ok (S.Syntax_rules.make ~syntax_rules:[ rule ] () |> Result.get_ok, T.Empty_list) in
         Alcotest.(check @@ result test_rule string) "simple" expected actual);
   ]

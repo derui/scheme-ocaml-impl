@@ -1,6 +1,12 @@
 module T = Type
 module Pr = Printer
 
+module Literal_set = Set.Make (struct
+  type t = string
+
+  let compare = Stdlib.compare
+end)
+
 (* module to parse scheme's list as data type defined in OCaml. This module define some parser combinator to be used in
    parsing syntax-rule. *)
 module List_parser = struct
@@ -118,6 +124,8 @@ module Pattern = struct
     | Nest_ellipsis     of t list * t * t list
     | Nest_ellipsis_dot of t list * t * t list * t
 
+  type variables = (string list * int) list
+
   let rec show = function
     | Symbol s                              -> Printf.sprintf "%s" s
     | Constant d                            -> Printf.sprintf "%s" @@ Pr.print d
@@ -142,7 +150,42 @@ end
 
 type pattern_in_rule = Pattern.t
 
-type syntax_rule = pattern_in_rule * Pattern.t
+type template = T.data
+
+module Syntax_rule = struct
+  type t = pattern_in_rule * template
+
+  let template (_, v) = v
+
+  let pattern (v, _) = v
+
+  (** get pattern variables in the pattern list. *)
+  let pattern_variables literals (pattern, _) =
+    let literals = Literal_set.of_list literals in
+    let rec pattern_variables' level accum pattern =
+      match pattern with
+      | Pattern.Symbol s when Literal_set.mem s literals -> accum
+      | Symbol s -> (level, s) :: accum
+      | Constant _ -> accum
+      | Nest list -> List.concat [ list |> List.map (pattern_variables' level []) |> List.concat; accum ]
+      | Nest_dot (list, dot) ->
+          let list = list |> List.map (pattern_variables' level []) |> List.concat
+          and pattern = pattern_variables' level [] dot in
+          List.concat [ list; pattern; accum ]
+      | Nest_ellipsis (patterns, ellipsis, rest_patterns) ->
+          let variables = patterns |> List.map (pattern_variables' level []) |> List.concat
+          and ellipsis = pattern_variables' (succ level) [] ellipsis
+          and rest_variables = rest_patterns |> List.map (pattern_variables' level []) |> List.concat in
+          List.concat [ variables; ellipsis; rest_variables ]
+      | Nest_ellipsis_dot (patterns, ellipsis, rest_patterns, dot) ->
+          let variables = patterns |> List.map (pattern_variables' level []) |> List.concat
+          and ellipsis = pattern_variables' (succ level) [] ellipsis
+          and rest_variables = rest_patterns |> List.map (pattern_variables' level []) |> List.concat
+          and dot = pattern_variables' level [] dot in
+          List.concat [ variables; ellipsis; rest_variables; dot ]
+    in
+    pattern_variables' 0 [] pattern
+end
 
 (** Syntax rules type and functions. Syntax_rule is representation that is a pair of pattern and template in
     syntax-rules. *)
@@ -150,22 +193,22 @@ module Syntax_rules = struct
   type t = {
     ellipsis : string;
     literals : string list;
-    syntax_rules : syntax_rule list;
+    syntax_rules : Syntax_rule.t list;
   }
 
-  let validate_syntax_rule ellipsis pattern =
+  let validate_rule_pattern ellipsis rule =
     let open Lib.Result.Let_syntax in
     let ellipsis_count list =
       List.filter (function Pattern.Symbol v when v = ellipsis -> true | _ -> false) list |> List.length
     in
-    let rec validate_syntax_rule' = function
+    let rec validate_rule_pattern' = function
       | Pattern.Nest patterns            ->
           let count = ellipsis_count patterns in
           let* _ = if count > 1 then Error "Ellipsis cound not contains in same pattern" else Ok () in
           List.fold_left
             (fun accum v ->
               let* () = accum in
-              validate_syntax_rule' v)
+              validate_rule_pattern' v)
             (Ok ()) patterns
       | Pattern.Nest_dot (patterns, dot) ->
           let count = ellipsis_count patterns in
@@ -174,173 +217,61 @@ module Syntax_rules = struct
             List.fold_left
               (fun accum v ->
                 let* () = accum in
-                validate_syntax_rule' v)
+                validate_rule_pattern' v)
               (Ok ()) patterns
           in
-          validate_syntax_rule' dot
+          validate_rule_pattern' dot
       | _                                -> Ok ()
     in
-    match pattern with
-    | Pattern.Nest _ | Pattern.Nest_dot _ -> validate_syntax_rule' pattern
+    match Syntax_rule.pattern rule with
+    | Pattern.Nest _ | Pattern.Nest_dot _ -> validate_rule_pattern' @@ Syntax_rule.pattern rule
     | _                                   -> Error "Pattern must be list"
+
+  let validate_template literals ellipsis rule =
+    let variables = Syntax_rule.pattern_variables literals rule in
+    let open Lib.Result.Let_syntax in
+    let rec validate_template' level template =
+      let variables_in_level =
+        List.filter_map (fun (level', symbol) -> if level >= level' then Some symbol else None) variables
+      in
+      match template with
+      | T.Number _ | T.False | T.True -> Ok ()
+      | T.Symbol v when v = ellipsis -> Error "Invalid template: ellipsis used as unaided"
+      | T.Symbol v -> if List.mem v variables_in_level then Ok () else Error (Printf.sprintf "Invalid level: %s" v)
+      | T.Cons (v, T.Cons (T.Symbol e, rest)) when e = ellipsis ->
+          let* () = validate_template' (succ level) v in
+          validate_template' level rest
+      | T.Cons (v, rest) ->
+          let* () = validate_template' (succ level) v in
+          validate_template' level rest
+      | T.Empty_list -> Ok ()
+      | _ -> Error "Invalid syntax"
+    in
+    validate_template' 0 @@ Syntax_rule.template rule
+
+  let validate_syntax_rule literals ellipsis rule =
+    let open Lib.Result.Let_syntax in
+    let* () = validate_rule_pattern ellipsis rule in
+    validate_template literals ellipsis rule
 
   let make ?(ellipsis = "...") ?(literals = []) ?(syntax_rules = []) () =
     let open Lib.Result.Let_syntax in
     let* _ =
       List.fold_left
-        (fun accum (patterns, _) ->
+        (fun accum rule ->
           let* _ = accum in
-          let* _ = validate_syntax_rule ellipsis patterns in
+          let* _ = validate_syntax_rule literals ellipsis rule in
           Ok ())
         (Ok ()) syntax_rules
     in
     Ok { ellipsis; literals; syntax_rules }
 
   let show { ellipsis; literals; syntax_rules; _ } =
-    let show_syntax_rules (p, t) = Printf.sprintf "(%s ==> %s)" (Pattern.show p) (Pattern.show t) in
+    let show_syntax_rules (p, t) = Printf.sprintf "(%s ==> %s)" (Pattern.show p) (Pr.print t) in
     Printf.sprintf "{ellipsis = %s; literals = %s; syntax_rules = %s}" ellipsis (String.concat "," literals)
       (String.concat ";" @@ List.map show_syntax_rules syntax_rules)
 
   let pp fmt v = Format.fprintf fmt "%s" @@ show v
-end
-
-(** Pattern_match do matching between Syntax_rule and list that is argument of syntax. Result of matching is used to
-    template expansion in Template_expansion module. *)
-module Pattern_matcher = struct
-  type mapped_type =
-    | Literal  of string
-    | Variable of T.data
-
-  and t = {
-    symbol_table : (string, mapped_type) Hashtbl.t;
-    level : t list;
-  }
-
-  let make () = { symbol_table = Hashtbl.create 0; level = [] }
-
-  let set_level t level = { t with level }
-
-  let put_literal t key data =
-    Hashtbl.replace t.symbol_table key (Literal data);
-    t
-
-  let put_pattern_variable t key data =
-    Hashtbl.replace t.symbol_table key (Variable data);
-    t
-
-  let rec is_invalid_pattern literals patterns =
-    let symbol_patterns =
-      List.filter_map (function Pattern.Symbol s -> Some s | _ -> None) patterns
-      |> List.filter (fun v -> List.exists (fun l -> l = v) literals)
-    in
-    let uniq_symbols = List.sort_uniq Stdlib.compare symbol_patterns in
-    let nested_patterns = List.filter_map (function Pattern.Nest v -> Some v | _ -> None) patterns in
-    if List.length symbol_patterns <> List.length uniq_symbols then true
-    else List.exists (is_invalid_pattern literals) nested_patterns
-
-  module Literal_set = Set.Make (struct
-    type t = string
-
-    let compare = Stdlib.compare
-  end)
-
-  let rec match_pattern pattern datum literal_set t =
-    match (pattern, datum) with
-    | Pattern.Symbol v, T.Symbol s when Literal_set.mem v literal_set ->
-        if v = s then Some (put_literal t v s) else None
-    (* match, but can not use matched value in template *)
-    | Pattern.Symbol v, (_ as s) when v <> "_" -> Some (put_pattern_variable t v s)
-    | Pattern.Symbol v, _ when v = "_" -> Some t
-    | Pattern.Constant (T.Number v), T.Number v' when v = v' -> Some t
-    | Pattern.Constant T.True, T.True | Pattern.Constant T.False, T.False -> Some t
-    | Pattern.Nest patterns, (T.Cons _ as l) -> match_pattern_list patterns l literal_set t
-    | Pattern.Nest_dot (patterns, dot), (T.Cons _ as l) -> match_pattern_dot_list (patterns, dot) l literal_set t
-    | Pattern.Nest_ellipsis (patterns, ellipsis_pattern, rest_patterns), (T.Cons _ as l) ->
-        match_pattern_ellipsis_list (patterns, ellipsis_pattern, rest_patterns) l literal_set t
-    | Pattern.Nest_ellipsis_dot (patterns, ellipsis_pattern, rest_patterns, dot), (T.Cons _ as l) ->
-        match_pattern_ellipsis_dot_list (patterns, ellipsis_pattern, rest_patterns, dot) l literal_set t
-    | _ -> None
-
-  and match_pattern_list patterns data literal_set t =
-    let open Lib.Option.Let_syntax in
-    match (patterns, data) with
-    | [ v ], T.Cons (v', T.Empty_list) -> match_pattern v v' literal_set t
-    | v :: rest, T.Cons (v', rest')    ->
-        let* _ = match_pattern v v' literal_set t in
-        match_pattern_list rest rest' literal_set t
-    | [], T.Empty_list                 -> Some t
-    | _, _                             -> None
-
-  and match_pattern_dot_list (patterns, dot) data literal_set t =
-    let open Lib.Option.Let_syntax in
-    match (patterns, data) with
-    | [ v ], T.Cons (v', dot')      ->
-        let* _ = match_pattern v v' literal_set t in
-        match_pattern dot dot' literal_set t
-    | v :: rest, T.Cons (v', rest') ->
-        let* _ = match_pattern v v' literal_set t in
-        match_pattern_dot_list (rest, dot) rest' literal_set t
-    | _, _                          -> None
-
-  and match_pattern_ellipsis_list (patterns, ellipsis, rest_patterns) data literal_set t =
-    let open Lib.Option.Let_syntax in
-    let minimum_len = List.length patterns + List.length rest_patterns
-    and list_len = Internal_lib.length_of_list data in
-    let* () = if minimum_len > list_len then None else Some () in
-    let* t = match_pattern_list patterns (Internal_lib.take_list data (List.length patterns)) literal_set t in
-    let ellipsis_count = max 0 @@ (list_len - minimum_len) in
-    let rec match_ellipsis count data patterns =
-      if count = 0 then Some (List.rev patterns)
-      else
-        match data with
-        | T.Cons (v, rest) ->
-            let* t = match_pattern ellipsis v literal_set (make ()) in
-            match_ellipsis (pred count) rest (t :: patterns)
-        | _                -> None
-    in
-    let* ellipsis = match_ellipsis ellipsis_count (Internal_lib.tail_list data @@ List.length patterns) [] in
-    let leveled_t = set_level t ellipsis in
-    let* t =
-      match_pattern_list rest_patterns
-        (Internal_lib.tail_list data (List.length patterns + ellipsis_count))
-        literal_set leveled_t
-    in
-    Some t
-
-  and match_pattern_ellipsis_dot_list (patterns, ellipsis, rest_patterns, dot) data literal_set t =
-    let open Lib.Option.Let_syntax in
-    let minimum_len = List.length patterns + List.length rest_patterns
-    and list_len = Internal_lib.length_of_list data in
-    let* () = if minimum_len > list_len then None else Some () in
-    let* t = match_pattern_list patterns (Internal_lib.take_list data (List.length patterns)) literal_set t in
-    let ellipsis_count = max 0 @@ (list_len - minimum_len) in
-    let rec match_ellipsis count data patterns =
-      if count = 0 then Some (List.rev patterns)
-      else
-        match data with
-        | T.Cons (v, rest) ->
-            let* t = match_pattern ellipsis v literal_set (make ()) in
-            match_ellipsis (pred count) rest (t :: patterns)
-        | _                -> None
-    in
-    let* ellipsis = match_ellipsis ellipsis_count (Internal_lib.tail_list data @@ List.length patterns) [] in
-    let leveled_t = set_level t ellipsis in
-    let* t =
-      match_pattern_dot_list (rest_patterns, dot)
-        (Internal_lib.tail_list data (List.length patterns + ellipsis_count))
-        literal_set leveled_t
-    in
-    Some t
-
-  (* Get mapped symbol table from list by the pattern if matched. *)
-  let match_rule_pattern ~syntax_rule ~literals _ =
-    let patterns, _ = syntax_rule in
-    let _ = make () in
-    (* TODO: Get more specific error information *)
-    if is_invalid_pattern literals patterns then Error "Invalid pattern"
-    else
-      let _ = Literal_set.of_list literals in
-      failwith "not implemented"
 end
 
 (** Parser for syntax-rule. *)
@@ -398,14 +329,11 @@ module Rule_parser = struct
     in
     match cdr with None -> L.pure (Pattern.Nest v) | Some e -> L.pure (Pattern.Nest_dot (v, e))
 
-  (* Parsing template is the same rule for pattern. *)
-  let template : Pattern.t L.t = pattern
-
-  let syntax_rule : syntax_rule L.t =
+  let syntax_rule : Syntax_rule.t L.t =
     let open L.Let_syntax in
     let* l = list in
     let* pattern = lift pattern_in_rule l in
-    let* template = template in
+    let* template = L.element in
     L.pure (pattern, template)
 
   let ellipsis =
