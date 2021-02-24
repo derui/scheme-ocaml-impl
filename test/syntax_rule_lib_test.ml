@@ -75,31 +75,29 @@ let pattern_parser_test =
     Alcotest.test_case "Rule Parser: parse one symbol pattern" `Quick (fun () ->
         let list = [ T.Symbol "a"; T.Symbol "b" ] |> list_to_scheme_list in
         let actual = S.Rule_parser.pattern_in_rule list in
-        let expected = Ok (P.Nest [ P.Constant (T.Symbol "b") ], T.Empty_list) in
+        let expected = Ok (P.Nest [ P.Symbol "b" ], T.Empty_list) in
         Alcotest.(check rule_pp) "simple" expected actual);
     Alcotest.test_case "Rule Parser: parse some symbol pattern" `Quick (fun () ->
         let list = [ T.Symbol "a"; T.Symbol "b"; T.Symbol "c"; T.Number "10" ] |> list_to_scheme_list in
         let actual = S.Rule_parser.pattern_in_rule list in
-        let expected =
-          Ok (P.Nest [ P.Constant (T.Symbol "b"); P.Constant (T.Symbol "c"); P.Constant (T.Number "10") ], T.Empty_list)
-        in
+        let expected = Ok (P.Nest [ P.Symbol "b"; P.Symbol "c"; P.Constant (T.Number "10") ], T.Empty_list) in
         Alcotest.(check rule_pp) "simple" expected actual);
     Alcotest.test_case "Rule Parser: parse nested pattern" `Quick (fun () ->
         let list =
           T.Constructor.[ symbol "a"; [ symbol "a"; symbol "b" ] |> list_to_scheme_list ] |> list_to_scheme_list
         in
         let actual = S.Rule_parser.pattern_in_rule list in
-        let expected = Ok (P.Nest [ P.Nest [ P.Constant (T.Symbol "a"); P.Constant (T.Symbol "b") ] ], T.Empty_list) in
+        let expected = Ok (P.Nest [ P.Nest [ P.Symbol "a"; P.Symbol "b" ] ], T.Empty_list) in
         Alcotest.(check rule_pp) "simple" expected actual);
     Alcotest.test_case "Rule Parser: parse pattern contained ellipsis" `Quick (fun () ->
         let list = T.Constructor.[ symbol "a"; symbol "a"; symbol "..." ] |> list_to_scheme_list in
         let actual = S.Rule_parser.pattern_in_rule list in
-        let expected = Ok (P.Nest [ P.Constant (T.Symbol "a"); P.Constant (T.Symbol "...") ], T.Empty_list) in
+        let expected = Ok (P.Nest [ P.Symbol "a"; P.Symbol "..." ], T.Empty_list) in
         Alcotest.(check rule_pp) "simple" expected actual);
     Alcotest.test_case "Rule Parser: parse pattern contained dot" `Quick (fun () ->
         let list = T.Constructor.(cons (symbol "a") @@ cons (symbol "b") (symbol "c")) in
         let actual = S.Rule_parser.pattern_in_rule list in
-        let expected = Ok (P.Nest_dot ([ P.Constant (T.Symbol "b") ], P.Constant (T.Symbol "c")), T.Empty_list) in
+        let expected = Ok (P.Nest_dot ([ P.Symbol "b" ], P.Symbol "c"), T.Empty_list) in
         Alcotest.(check rule_pp) "simple" expected actual);
   ]
 
@@ -141,4 +139,46 @@ let syntax_rules_parser_test =
         Alcotest.(check @@ result test_rule string) "simple" expected actual);
   ]
 
-let tests = list_parser_tests @ pattern_parser_test @ syntax_rule_parser_test @ syntax_rules_parser_test
+let syntax_rule_test =
+  let parse str = Lexing.from_string str |> Ocaml_scheme.(Parser.program Ocaml_scheme.Lexer.token) |> List.hd in
+  let module P = S.Pattern in
+  [
+    Alcotest.test_case "Syntax rule: no pattern variable if pattern is not contains symbol" `Quick (fun () ->
+        let list = "((a 1 2 3) 5)" |> parse in
+        let actual =
+          S.Rule_parser.syntax_rule list |> Result.map (fun (v, _) -> S.Syntax_rule.pattern_variables [] v)
+        in
+        let expected = Ok [] in
+        Alcotest.(check @@ result (list @@ pair int string) string) "simple" expected actual);
+    Alcotest.test_case "Syntax rule: have level 0 pattern variable " `Quick (fun () ->
+        let list = "((_ b 2 3) 5)" |> parse in
+        let actual =
+          S.Rule_parser.syntax_rule list |> Result.map (fun (v, _) -> S.Syntax_rule.pattern_variables [] v)
+        in
+        let expected = Ok [ (0, "b") ] in
+        Alcotest.(check @@ result (list @@ pair int string) string) "simple" expected actual);
+    Alcotest.test_case "Syntax rule: have level 0 pattern variable with nested" `Quick (fun () ->
+        let list = "((_ b (c d) e) 5)" |> parse in
+        let actual =
+          S.Rule_parser.syntax_rule list
+          |> Result.map (fun (v, _) -> S.Syntax_rule.pattern_variables [] v)
+          |> Result.map (List.sort Stdlib.compare)
+        in
+        let expected = Ok ([ (0, "b"); (0, "c"); (0, "d"); (0, "e") ] |> List.sort Stdlib.compare) in
+        Alcotest.(check @@ result (list @@ pair int string) string) "simple" expected actual);
+    Alcotest.test_case "Syntax rule: have level 1 pattern variable with ellipsis" `Quick (fun () ->
+        let rule = (P.(Nest_ellipsis ([ P.Symbol "a" ], P.Symbol "b", [])), T.Symbol "c") in
+        let actual = rule |> S.Syntax_rule.pattern_variables [] |> List.sort Stdlib.compare in
+        let expected = [ (0, "a"); (1, "b") ] |> List.sort Stdlib.compare in
+        Alcotest.(check @@ list @@ pair int string) "simple" expected actual);
+    Alcotest.test_case "Syntax rule: have pattern variable that have level greater than 1" `Quick (fun () ->
+        let rule =
+          (P.(Nest_ellipsis ([ P.Symbol "a" ], Nest_ellipsis ([ Symbol "b" ], Symbol "c", []), [])), T.Symbol "c")
+        in
+        let actual = rule |> S.Syntax_rule.pattern_variables [] |> List.sort Stdlib.compare in
+        let expected = [ (0, "a"); (1, "b"); (2, "c") ] |> List.sort Stdlib.compare in
+        Alcotest.(check @@ list @@ pair int string) "simple" expected actual);
+  ]
+
+let tests =
+  list_parser_tests @ pattern_parser_test @ syntax_rule_parser_test @ syntax_rules_parser_test @ syntax_rule_test

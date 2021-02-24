@@ -155,6 +155,10 @@ type template = T.data
 module Syntax_rule = struct
   type t = pattern_in_rule * template
 
+  let show (pattern, template) = Printf.sprintf "%s => %s" (Pattern.show pattern) (Pr.print template)
+
+  let pp fmt t = Format.fprintf fmt "%s" @@ show t
+
   let template (_, v) = v
 
   let pattern (v, _) = v
@@ -163,11 +167,18 @@ module Syntax_rule = struct
   let pattern_variables literals (pattern, _) =
     let literals = Literal_set.of_list literals in
     let rec pattern_variables' level accum pattern =
+      print_endline @@ Pattern.show pattern;
+
       match pattern with
       | Pattern.Symbol s when Literal_set.mem s literals -> accum
-      | Symbol s -> (level, s) :: accum
+      | Symbol s ->
+          print_endline s;
+          (level, s) :: accum
       | Constant _ -> accum
-      | Nest list -> List.concat [ list |> List.map (pattern_variables' level []) |> List.concat; accum ]
+      | Nest list ->
+          let v = list |> List.map (pattern_variables' level []) |> List.concat in
+          Printf.printf "result %s\n" (String.concat ";" @@ List.map (fun (l, v) -> Printf.sprintf "%d,%s" l v) v);
+          v @ accum
       | Nest_dot (list, dot) ->
           let list = list |> List.map (pattern_variables' level []) |> List.concat
           and pattern = pattern_variables' level [] dot in
@@ -292,8 +303,9 @@ module Rule_parser = struct
     let open L.Let_syntax in
     let open L.Infix in
     let pattern_1 data =
-      let p = (fun v -> Pattern.Constant v) <$> L.(symbol <|> constant) in
-      p data
+      let p1 = (function T.Symbol s -> Pattern.Symbol s | _ -> failwith "Invalid") <$> symbol in
+      let p2 = (fun v -> Pattern.Constant v) <$> constant in
+      L.(p1 <|> p2) data
     in
     let pattern_2 data =
       let v =
@@ -318,7 +330,6 @@ module Rule_parser = struct
     let open L.Infix in
     let* _ = symbol in
     let* v = L.many pattern in
-    print_endline @@ Printf.sprintf "patterns: (%s)" (String.concat "|" @@ List.map Pattern.show v);
     let* cdr =
       let cdr_p =
         L.(
