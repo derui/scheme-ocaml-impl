@@ -167,17 +167,12 @@ module Syntax_rule = struct
   let pattern_variables literals (pattern, _) =
     let literals = Literal_set.of_list literals in
     let rec pattern_variables' level accum pattern =
-      print_endline @@ Pattern.show pattern;
-
       match pattern with
       | Pattern.Symbol s when Literal_set.mem s literals -> accum
-      | Symbol s ->
-          print_endline s;
-          (level, s) :: accum
+      | Symbol s -> (level, s) :: accum
       | Constant _ -> accum
       | Nest list ->
           let v = list |> List.map (pattern_variables' level []) |> List.concat in
-          Printf.printf "result %s\n" (String.concat ";" @@ List.map (fun (l, v) -> Printf.sprintf "%d,%s" l v) v);
           v @ accum
       | Nest_dot (list, dot) ->
           let list = list |> List.map (pattern_variables' level []) |> List.concat
@@ -234,9 +229,12 @@ module Syntax_rules = struct
           validate_rule_pattern' dot
       | _                                -> Ok ()
     in
-    match Syntax_rule.pattern rule with
-    | Pattern.Nest _ | Pattern.Nest_dot _ -> validate_rule_pattern' @@ Syntax_rule.pattern rule
-    | _                                   -> Error "Pattern must be list"
+    let* () =
+      match Syntax_rule.pattern rule with
+      | Pattern.Nest _ | Pattern.Nest_dot _ -> Syntax_rule.pattern rule |> validate_rule_pattern'
+      | _                                   -> Error "Pattern must be list"
+    in
+    Ok rule
 
   let validate_template literals ellipsis rule =
     let variables = Syntax_rule.pattern_variables literals rule in
@@ -262,20 +260,47 @@ module Syntax_rules = struct
 
   let validate_syntax_rule literals ellipsis rule =
     let open Lib.Result.Let_syntax in
-    let* () = validate_rule_pattern ellipsis rule in
-    validate_template literals ellipsis rule
+    let* _ = validate_rule_pattern ellipsis rule in
+    let* _ = validate_template literals ellipsis rule in
+    Ok rule
+
+  let apply_ellipsis_type ellipsis rule =
+    let module P = Pattern in
+    let pattern = Syntax_rule.pattern rule in
+    let rec change_pattern_type accum dot = function
+      | p :: P.Symbol v :: rest when v = ellipsis -> (
+          match dot with
+          | Some dot -> P.Nest_ellipsis_dot (List.rev accum, p, rest, dot)
+          | None     -> P.Nest_ellipsis (List.rev accum, p, rest) )
+      | [] -> P.Nest (List.rev accum)
+      | v :: rest -> change_pattern_type (v :: accum) dot rest
+    in
+    let rec apply_ellipsis_type' pattern =
+      match pattern with
+      | P.Constant _ | P.Symbol _  -> pattern
+      | P.Nest patterns            ->
+          let patterns = List.map apply_ellipsis_type' patterns in
+          change_pattern_type [] None patterns
+      | P.Nest_dot (patterns, dot) ->
+          let patterns = List.map apply_ellipsis_type' patterns in
+          change_pattern_type [] (Some dot) patterns
+      | _                          -> pattern
+    in
+    let pattern = apply_ellipsis_type' pattern in
+    (pattern, Syntax_rule.template rule)
 
   let make ?(ellipsis = "...") ?(literals = []) ?(syntax_rules = []) () =
     let open Lib.Result.Let_syntax in
-    let* _ =
+    let* syntax_rules =
       List.fold_left
         (fun accum rule ->
-          let* _ = accum in
-          let* _ = validate_syntax_rule literals ellipsis rule in
-          Ok ())
-        (Ok ()) syntax_rules
+          let* accum = accum in
+          let* rule = validate_syntax_rule literals ellipsis rule in
+          Ok (rule :: accum))
+        (Ok []) syntax_rules
     in
-    Ok { ellipsis; literals; syntax_rules }
+    let syntax_rules = List.map (apply_ellipsis_type ellipsis) syntax_rules in
+    Ok { ellipsis; literals; syntax_rules = List.rev syntax_rules }
 
   let show { ellipsis; literals; syntax_rules; _ } =
     let show_syntax_rules (p, t) = Printf.sprintf "(%s ==> %s)" (Pattern.show p) (Pr.print t) in

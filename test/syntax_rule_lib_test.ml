@@ -180,5 +180,26 @@ let syntax_rule_test =
         Alcotest.(check @@ list @@ pair int string) "simple" expected actual);
   ]
 
+let syntax_rules_test =
+  let test_syntax_rules = Alcotest.testable S.(Syntax_rules.pp) ( = ) in
+  let parse str = Lexing.from_string str |> Ocaml_scheme.(Parser.program Ocaml_scheme.Lexer.token) |> List.hd in
+  let module P = S.Pattern in
+  [
+    Alcotest.test_case "Syntax rules: parse and create simple pattern" `Quick (fun () ->
+        let list = "(() ((a 1 2 3) 5))" |> parse in
+
+        let actual = S.Rule_parser.syntax_rules list |> Result.map fst in
+        let syntax_rules = [ "((a 1 2 3) 5)" |> parse |> S.Rule_parser.syntax_rule |> Result.get_ok |> fst ] in
+        let expected = S.Syntax_rules.make ~syntax_rules () in
+        Alcotest.(check @@ result test_syntax_rules string) "simple" expected actual);
+    Alcotest.test_case "Syntax rules: create patterns that are contained ellipsis" `Quick (fun () ->
+        let list = "(() ((_ b ... 2 3) 5))" |> parse in
+        let actual = S.Rule_parser.syntax_rules list |> Result.map fst in
+        let syntax_rules = [ "((_ b ... 2 3) 5)" |> parse |> S.Rule_parser.syntax_rule |> Result.get_ok |> fst ] in
+        let expected = S.Syntax_rules.make ~syntax_rules () in
+        Alcotest.(check @@ result test_syntax_rules string) "simple" expected actual);
+  ]
+
 let tests =
   list_parser_tests @ pattern_parser_test @ syntax_rule_parser_test @ syntax_rules_parser_test @ syntax_rule_test
+  @ syntax_rules_test
