@@ -258,6 +258,22 @@ module Syntax_rules = struct
     in
     validate_template' 0 @@ Syntax_rule.template rule
 
+  let validate_unique_symbol literals rule =
+    let rec collect_symbols accum = function
+      | Pattern.Symbol v when List.mem v literals -> accum
+      | Symbol v -> v :: accum
+      | Constant _ -> accum
+      | Nest patterns -> List.fold_left collect_symbols accum patterns
+      | Nest_dot (patterns, dot) -> List.fold_left collect_symbols accum (dot :: patterns)
+      | Nest_ellipsis (patterns, _, rest) -> List.fold_left collect_symbols accum (patterns @ rest)
+      | Nest_ellipsis_dot (patterns, _, rest, dot) -> List.fold_left collect_symbols accum ((dot :: patterns) @ rest)
+    in
+    let symbols = collect_symbols [] (Syntax_rule.pattern rule) in
+    let uniq_symbols = List.sort_uniq String.compare symbols in
+    if List.length symbols <> List.length uniq_symbols then
+      Error "Found some pattern variables appears more than once in the definition"
+    else Ok rule
+
   let validate_syntax_rule literals ellipsis rule =
     let open Lib.Result.Let_syntax in
     let* _ = validate_rule_pattern ellipsis rule in
@@ -300,6 +316,14 @@ module Syntax_rules = struct
         (Ok []) syntax_rules
     in
     let syntax_rules = List.map (apply_ellipsis_type ellipsis) syntax_rules in
+    let* syntax_rules =
+      List.fold_left
+        (fun accum rule ->
+          let* accum = accum in
+          let* rule = validate_unique_symbol literals rule in
+          Ok (rule :: accum))
+        (Ok []) syntax_rules
+    in
     Ok { ellipsis; literals; syntax_rules = List.rev syntax_rules }
 
   let show { ellipsis; literals; syntax_rules; _ } =

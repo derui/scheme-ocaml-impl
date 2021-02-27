@@ -21,6 +21,21 @@ module Pattern_matcher = struct
     level : t list;
   }
 
+  let show_mapped_type = function
+    | Literal v  -> Printf.sprintf "Literal(%s)" v
+    | Variable v -> Printf.sprintf "Variable(%s)" @@ Pr.show v
+
+  let rec show t =
+    let show_symbol_table t =
+      Hashtbl.to_seq t
+      |> Seq.map (fun (k, v) -> Printf.sprintf "%s => %s" k (show_mapped_type v))
+      |> List.of_seq |> String.concat ";"
+    in
+    let show_level t = List.map show t |> String.concat "\n" in
+    Printf.sprintf "(symbols = %s; leveled = %s)" (show_symbol_table t.symbol_table) (show_level t.level)
+
+  let pp fmt t = Format.fprintf fmt "%s" @@ show t
+
   let make () = { symbol_table = Hashtbl.create 0; level = [] }
 
   let set_level t level = { t with level }
@@ -32,16 +47,6 @@ module Pattern_matcher = struct
   let put_pattern_variable t key data =
     Hashtbl.replace t.symbol_table key (Variable data);
     t
-
-  let rec is_invalid_pattern literals patterns =
-    let symbol_patterns =
-      List.filter_map (function Pattern.Symbol s -> Some s | _ -> None) patterns
-      |> List.filter (fun v -> List.exists (fun l -> l = v) literals)
-    in
-    let uniq_symbols = List.sort_uniq Stdlib.compare symbol_patterns in
-    let nested_patterns = List.filter_map (function Pattern.Nest v -> Some v | _ -> None) patterns in
-    if List.length symbol_patterns <> List.length uniq_symbols then true
-    else List.exists (is_invalid_pattern literals) nested_patterns
 
   let rec match_pattern pattern datum literal_set t =
     match (pattern, datum) with
@@ -132,12 +137,24 @@ module Pattern_matcher = struct
     Some t
 
   (* Get mapped symbol table from list by the pattern if matched. *)
-  let match_rule_pattern ~syntax_rule ~literals _ =
-    let patterns, _ = syntax_rule in
-    let _ = make () in
-    (* TODO: Get more specific error information *)
-    if is_invalid_pattern literals patterns then Error "Invalid pattern"
-    else
-      let _ = Literal_set.of_list literals in
-      failwith "not implemented"
+  let match_syntax_rule ~syntax_rule ~literals ~data =
+    let pattern = Syntax_rule_lib.Syntax_rule.pattern syntax_rule in
+    let t = make () in
+    let literals = Literal_set.of_list literals in
+    match_pattern pattern data literals t
 end
+
+let match_syntax_rules ~syntax_rules ~data =
+  let module L = Syntax_rule_lib in
+  let { L.Syntax_rules.literals; syntax_rules; _ } = syntax_rules in
+  let result =
+    List.fold_left
+      (fun ret syntax_rule ->
+        match ret with
+        | Some _ -> ret
+        | None   ->
+            let v = Pattern_matcher.match_syntax_rule ~syntax_rule ~literals ~data in
+            v |> Option.map (fun v -> (v, syntax_rule)))
+      None syntax_rules
+  in
+  result
