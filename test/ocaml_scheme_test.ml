@@ -6,6 +6,7 @@ let tests =
     ("Eval", Eval_test.tests);
     ("Printer", Printer_test.tests);
     ("Syntax rule library", Syntax_rule_lib_test.tests);
+    ("Syntax rule pattern matcher", Syntax_rule_pattern_matcher_test.tests);
   ]
 
 let () = Alcotest.run "OCaml scheme learning" tests

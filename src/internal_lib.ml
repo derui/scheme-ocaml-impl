@@ -26,3 +26,26 @@ let validate_arguments formal data =
 let list_to_scheme_list list =
   let rec to_list' accum = function [] -> accum | v :: rest -> to_list' (T.Cons (v, accum)) rest in
   List.rev list |> to_list' T.Empty_list
+
+let take_list arg n =
+  let rec loop accum count v =
+    if count = 0 then List.rev accum
+    else
+      match v with
+      | T.Cons (v, T.Empty_list)       -> List.rev (v :: accum)
+      | T.Cons (v, (T.Cons _ as rest)) -> loop (v :: accum) (pred count) rest
+      | T.Cons (v, _)                  -> List.rev (v :: accum)
+      | _                              -> []
+  in
+  loop [] n arg |> list_to_scheme_list
+
+let tail_list arg n =
+  let rec loop count v =
+    if count = 0 then v
+    else
+      match v with
+      | T.Cons (_, (T.Cons _ as rest)) -> loop (pred count) rest
+      | T.Cons (_, _)                  -> failwith "Length of list less than n"
+      | _                              -> failwith "Invalid argument"
+  in
+  loop n arg

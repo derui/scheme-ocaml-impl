@@ -13,6 +13,7 @@ let bool_false = '#' 'f'
 let bool_true = '#' 't'
 let dot = '.'
 let special_char = ['!' '$' '%' '&' '*' '+' '-' '/' ':' '<' '=' '>' '?' '@' '^' '_' '~']
+let ellipsis = '.' '.' '.'
 let symbol_first = alphabet | special_char
 let symbol_rest = alphabet | special_char | dot | numeric
 let quasiquote = '`'
@@ -30,6 +31,7 @@ rule token = parse
   | quote {QUOTE}
   | comma {UNQUOTE}
   | dot {DOT}
+  | ellipsis {SYMBOL (Lexing.lexeme lexbuf)}
   | symbol_first {SYMBOL (Lexing.lexeme lexbuf)}
   | symbol_first symbol_rest+ {SYMBOL (Lexing.lexeme lexbuf)}
 (* this number lexer supports only little subset of Schema's number *)
