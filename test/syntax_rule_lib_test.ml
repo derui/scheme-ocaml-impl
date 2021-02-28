@@ -182,6 +182,8 @@ let syntax_rule_test =
 
 let syntax_rules_test =
   let test_syntax_rules = Alcotest.testable S.(Syntax_rules.pp) ( = ) in
+  let pattern_t = Alcotest.of_pp S.Pattern.pp in
+  let rule_t = Alcotest.(pair pattern_t exp_pp) in
   let parse str = Lexing.from_string str |> Ocaml_scheme.(Parser.program Ocaml_scheme.Lexer.token) |> List.hd in
   let module P = S.Pattern in
   [
@@ -198,6 +200,15 @@ let syntax_rules_test =
         let syntax_rules = [ "((_ b ... 2 3) 5)" |> parse |> S.Rule_parser.syntax_rule |> Result.get_ok |> fst ] in
         let expected = S.Syntax_rules.make ~syntax_rules () in
         Alcotest.(check @@ result test_syntax_rules string) "simple" expected actual);
+    Alcotest.test_case "Syntax rules: order of rules should be same as appearance order" `Quick (fun () ->
+        let list = "(() ((_ a) 5) ((_ b) 6))" |> parse in
+        let parse_rule v = parse v |> S.Rule_parser.syntax_rule |> Result.get_ok |> fst in
+        let expected = [ "((_ a) 5)" |> parse_rule; "((_ b) 6)" |> parse_rule ] in
+        let actual = S.Rule_parser.syntax_rules list |> Result.map fst |> Result.get_ok in
+        let v l n = List.nth l.S.Syntax_rules.syntax_rules n in
+
+        Alcotest.(check rule_t) "simple" (List.nth expected 0) (v actual 0);
+        Alcotest.(check rule_t) "simple" (List.nth expected 1) (v actual 1));
   ]
 
 let tests =

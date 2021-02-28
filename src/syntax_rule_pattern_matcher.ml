@@ -38,30 +38,30 @@ module Pattern_matcher = struct
 
   let make () = { symbol_table = Hashtbl.create 0; level = [] }
 
-  let set_level t level = { t with level }
+  let set_level level t = { t with level }
 
-  let put_literal t key data =
+  let put_literal key data t =
     Hashtbl.replace t.symbol_table key (Literal data);
     t
 
-  let put_pattern_variable t key data =
+  let put_pattern_variable key data t =
     Hashtbl.replace t.symbol_table key (Variable data);
     t
 
   let rec match_pattern pattern datum literal_set t =
     match (pattern, datum) with
     | Pattern.Symbol v, T.Symbol s when Literal_set.mem v literal_set ->
-        if v = s then Some (put_literal t v s) else None
+        if v = s then Some (put_literal v s t) else None
     (* match, but can not use matched value in template *)
-    | Pattern.Symbol v, (_ as s) when v <> "_" -> Some (put_pattern_variable t v s)
     | Pattern.Symbol v, _ when v = "_" -> Some t
+    | Pattern.Symbol v, (_ as s) -> Some (put_pattern_variable v s t)
     | Pattern.Constant (T.Number v), T.Number v' when v = v' -> Some t
     | Pattern.Constant T.True, T.True | Pattern.Constant T.False, T.False -> Some t
-    | Pattern.Nest patterns, (T.Cons _ as l) -> match_pattern_list patterns l literal_set t
-    | Pattern.Nest_dot (patterns, dot), (T.Cons _ as l) -> match_pattern_dot_list (patterns, dot) l literal_set t
-    | Pattern.Nest_ellipsis (patterns, ellipsis_pattern, rest_patterns), (T.Cons _ as l) ->
+    | Pattern.Nest patterns, (_ as l) -> match_pattern_list patterns l literal_set t
+    | Pattern.Nest_dot (patterns, dot), (_ as l) -> match_pattern_dot_list (patterns, dot) l literal_set t
+    | Pattern.Nest_ellipsis (patterns, ellipsis_pattern, rest_patterns), (_ as l) ->
         match_pattern_ellipsis_list (patterns, ellipsis_pattern, rest_patterns) l literal_set t
-    | Pattern.Nest_ellipsis_dot (patterns, ellipsis_pattern, rest_patterns, dot), (T.Cons _ as l) ->
+    | Pattern.Nest_ellipsis_dot (patterns, ellipsis_pattern, rest_patterns, dot), (_ as l) ->
         match_pattern_ellipsis_dot_list (patterns, ellipsis_pattern, rest_patterns, dot) l literal_set t
     | _ -> None
 
@@ -94,7 +94,7 @@ module Pattern_matcher = struct
     let* t = match_pattern_list patterns (Internal_lib.take_list data (List.length patterns)) literal_set t in
     let ellipsis_count = max 0 @@ (list_len - minimum_len) in
     let rec match_ellipsis count data patterns =
-      if count = 0 then Some (List.rev patterns)
+      if count = 0 then Some (List.rev patterns, data)
       else
         match data with
         | T.Cons (v, rest) ->
@@ -102,13 +102,9 @@ module Pattern_matcher = struct
             match_ellipsis (pred count) rest (t :: patterns)
         | _                -> None
     in
-    let* ellipsis = match_ellipsis ellipsis_count (Internal_lib.tail_list data @@ List.length patterns) [] in
-    let leveled_t = set_level t ellipsis in
-    let* t =
-      match_pattern_list rest_patterns
-        (Internal_lib.tail_list data (List.length patterns + ellipsis_count))
-        literal_set leveled_t
-    in
+    let* ellipsis, data = match_ellipsis ellipsis_count (Internal_lib.tail_list data @@ List.length patterns) [] in
+    let leveled_t = set_level ellipsis t in
+    let* t = match_pattern_list rest_patterns data literal_set leveled_t in
     Some t
 
   and match_pattern_ellipsis_dot_list (patterns, ellipsis, rest_patterns, dot) data literal_set t =
@@ -128,7 +124,7 @@ module Pattern_matcher = struct
         | _                -> None
     in
     let* ellipsis = match_ellipsis ellipsis_count (Internal_lib.tail_list data @@ List.length patterns) [] in
-    let leveled_t = set_level t ellipsis in
+    let leveled_t = set_level ellipsis t in
     let* t =
       match_pattern_dot_list (rest_patterns, dot)
         (Internal_lib.tail_list data (List.length patterns + ellipsis_count))

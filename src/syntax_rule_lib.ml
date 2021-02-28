@@ -314,6 +314,7 @@ module Syntax_rules = struct
           let* rule = validate_syntax_rule literals ellipsis rule in
           Ok (rule :: accum))
         (Ok []) syntax_rules
+      |> Result.map List.rev
     in
     let syntax_rules = List.map (apply_ellipsis_type ellipsis) syntax_rules in
     let* syntax_rules =
@@ -323,8 +324,9 @@ module Syntax_rules = struct
           let* rule = validate_unique_symbol literals rule in
           Ok (rule :: accum))
         (Ok []) syntax_rules
+      |> Result.map List.rev
     in
-    Ok { ellipsis; literals; syntax_rules = List.rev syntax_rules }
+    Ok { ellipsis; literals; syntax_rules }
 
   let show { ellipsis; literals; syntax_rules; _ } =
     let show_syntax_rules (p, t) = Printf.sprintf "(%s ==> %s)" (Pattern.show p) (Pr.print t) in
@@ -412,12 +414,10 @@ module Rule_parser = struct
 
   let syntax_rules : Syntax_rules.t L.t =
     let open L.Let_syntax in
+    let open L.Infix in
     let* ellipsis = L.(ellipsis <|> L.pure None) in
     let* literals = literals in
-    let p =
-      let* l = list in
-      lift syntax_rule l
-    in
+    let p = list >>= lift syntax_rule in
     let* syntax_rules = L.many1 p in
     Result.fold ~ok:(fun v -> L.pure v) ~error:(fun _ -> L.zero)
     @@ Syntax_rules.make ?ellipsis ~literals ~syntax_rules ()
