@@ -244,16 +244,17 @@ module Syntax_rules = struct
         List.filter_map (fun (level', symbol) -> if level >= level' then Some symbol else None) variables
       in
       match template with
-      | T.Number _ | T.False | T.True -> Ok ()
+      | T.Number _ | T.False | T.True -> Ok rule
       | T.Symbol v when v = ellipsis -> Error "Invalid template: ellipsis used as unaided"
-      | T.Symbol v -> if List.mem v variables_in_level then Ok () else Error (Printf.sprintf "Invalid level: %s" v)
+      | T.Symbol v -> if List.mem v variables_in_level then Ok rule else Error (Printf.sprintf "Invalid level: %s" v)
+      | T.Cons (T.Symbol e, T.Cons (T.Symbol e', T.Empty_list)) when e = ellipsis && e' = ellipsis -> Ok rule
       | T.Cons (v, T.Cons (T.Symbol e, rest)) when e = ellipsis ->
-          let* () = validate_template' (succ level) v in
+          let* rule = validate_template' (succ level) v in
           validate_template' level rest
       | T.Cons (v, rest) ->
-          let* () = validate_template' (succ level) v in
+          let* rule = validate_template' (succ level) v in
           validate_template' level rest
-      | T.Empty_list -> Ok ()
+      | T.Empty_list -> Ok rule
       | _ -> Error "Invalid syntax"
     in
     validate_template' 0 @@ Syntax_rule.template rule
@@ -307,25 +308,19 @@ module Syntax_rules = struct
 
   let make ?(ellipsis = "...") ?(literals = []) ?(syntax_rules = []) () =
     let open Lib.Result.Let_syntax in
-    let* syntax_rules =
+    let apply_validation f rules =
       List.fold_left
         (fun accum rule ->
           let* accum = accum in
-          let* rule = validate_syntax_rule literals ellipsis rule in
+          let* rule = f rule in
           Ok (rule :: accum))
-        (Ok []) syntax_rules
+        (Ok []) rules
       |> Result.map List.rev
     in
+    let* syntax_rules = apply_validation (validate_syntax_rule literals ellipsis) syntax_rules in
     let syntax_rules = List.map (apply_ellipsis_type ellipsis) syntax_rules in
-    let* syntax_rules =
-      List.fold_left
-        (fun accum rule ->
-          let* accum = accum in
-          let* rule = validate_unique_symbol literals rule in
-          Ok (rule :: accum))
-        (Ok []) syntax_rules
-      |> Result.map List.rev
-    in
+    let* syntax_rules = apply_validation (validate_unique_symbol literals) syntax_rules in
+    let* syntax_rules = apply_validation (validate_template literals ellipsis) syntax_rules in
     Ok { ellipsis; literals; syntax_rules }
 
   let show { ellipsis; literals; syntax_rules; _ } =

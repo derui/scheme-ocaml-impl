@@ -209,6 +209,17 @@ let syntax_rules_test =
 
         Alcotest.(check rule_t) "simple" (List.nth expected 0) (v actual 0);
         Alcotest.(check rule_t) "simple" (List.nth expected 1) (v actual 1));
+    Alcotest.test_case "Syntax rules: validate template if have unaided ellipsis" `Quick (fun () ->
+        let list = "(() ((_ b ) (...)))" |> parse in
+        let actual = S.Rule_parser.syntax_rules list |> Result.map fst in
+        let expected = Error "empty: ()" in
+        Alcotest.(check @@ result test_syntax_rules string) "simple" expected actual);
+    Alcotest.test_case "Syntax rules: allow ellipsis literal" `Quick (fun () ->
+        let list = "(() ((_ b ) (... ...)))" |> parse in
+        let actual = S.Rule_parser.syntax_rules list |> Result.map fst in
+        let syntax_rules = [ "((_ b) (... ...))" |> parse |> S.Rule_parser.syntax_rule |> Result.get_ok |> fst ] in
+        let expected = S.Syntax_rules.make ~syntax_rules () in
+        Alcotest.(check @@ result test_syntax_rules string) "simple" expected actual);
   ]
 
 let tests =
