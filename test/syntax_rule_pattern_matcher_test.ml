@@ -123,6 +123,18 @@ let ellipsis_matcher_tests =
         in
 
         Alcotest.(check result_t) "matched" expected actual);
+    Alcotest.test_case "match a pattern variable as a list" `Quick (fun () ->
+        let syntax_rules = parse_syntax_rules "(() ((_ a b) 1))" in
+        let data = parse "((1 2) 3)" in
+        let actual = M.match_syntax_rules ~syntax_rules ~data in
+        let expected =
+          Some
+            ( M.Pattern_matcher.(
+                make () |> put_pattern_variable "b" (T.Number "3") |> put_pattern_variable "a" (parse "(1 2)")),
+              List.hd syntax_rules.syntax_rules )
+        in
+
+        Alcotest.(check result_t) "matched" expected actual);
   ]
 
 let tests = matcher_tests @ ellipsis_matcher_tests

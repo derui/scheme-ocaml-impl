@@ -70,7 +70,7 @@ module Pattern_matcher = struct
     match (patterns, data) with
     | [ v ], T.Cons (v', T.Empty_list) -> match_pattern v v' literal_set t
     | v :: rest, T.Cons (v', rest')    ->
-        let* _ = match_pattern v v' literal_set t in
+        let* t = match_pattern v v' literal_set t in
         match_pattern_list rest rest' literal_set t
     | [], T.Empty_list                 -> Some t
     | _, _                             -> None
