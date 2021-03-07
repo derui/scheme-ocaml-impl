@@ -249,10 +249,10 @@ module Syntax_rules = struct
       | T.Symbol v -> if List.mem v variables_in_level then Ok rule else Error (Printf.sprintf "Invalid level: %s" v)
       | T.Cons (T.Symbol e, T.Cons (T.Symbol e', T.Empty_list)) when e = ellipsis && e' = ellipsis -> Ok rule
       | T.Cons (v, T.Cons (T.Symbol e, rest)) when e = ellipsis ->
-          let* rule = validate_template' (succ level) v in
+          let* _ = validate_template' (succ level) v in
           validate_template' level rest
       | T.Cons (v, rest) ->
-          let* rule = validate_template' (succ level) v in
+          let* _ = validate_template' (succ level) v in
           validate_template' level rest
       | T.Empty_list -> Ok rule
       | _ -> Error "Invalid syntax"

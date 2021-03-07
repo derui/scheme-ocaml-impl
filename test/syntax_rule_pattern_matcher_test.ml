@@ -28,7 +28,7 @@ let matcher_tests =
         let syntax_rules = parse_syntax_rules "(() ((_ a) 1))" in
         let data = parse "(1)" in
         let actual = M.match_syntax_rules ~syntax_rules ~data in
-        let expected = M.Pattern_matcher.(make () |> put_pattern_variable "a" (T.Number "1")) in
+        let expected = M.Pattern_matcher.(make () |> put_pattern_variable ("a", 0) (T.Number "1")) in
         let expected = Some (expected, List.hd syntax_rules.syntax_rules) in
 
         Alcotest.(check result_t) "matched" expected actual);
@@ -39,7 +39,7 @@ let matcher_tests =
         let expected =
           M.Pattern_matcher.(
             make ()
-            |> put_pattern_variable "a"
+            |> put_pattern_variable ("a", 0)
                  T.Constructor.(cons (symbol "a") @@ cons (symbol "b") @@ cons (symbol "c") T.Empty_list))
         in
         let expected = Some (expected, List.hd syntax_rules.syntax_rules) in
@@ -57,7 +57,7 @@ let matcher_tests =
         let data = parse "(b a)" in
         let expected =
           M.Pattern_matcher.(
-            make () |> put_pattern_variable "a" (T.Symbol "b") |> put_pattern_variable "b" (T.Symbol "a"))
+            make () |> put_pattern_variable ("a", 0) (T.Symbol "b") |> put_pattern_variable ("b", 0) (T.Symbol "a"))
         in
 
         let expected = Some (expected, List.nth syntax_rules.syntax_rules 1) in
@@ -68,7 +68,7 @@ let matcher_tests =
 
 let ellipsis_matcher_tests =
   [
-    Alcotest.test_case "match the simplest ellipsis pattern" `Quick (fun () ->
+    Alcotest.test_case "match the simplest ellipsis pattern with empty" `Quick (fun () ->
         let syntax_rules = parse_syntax_rules "(() ((_ a ...) 1))" in
         let data = parse "()" in
         let actual = M.match_syntax_rules ~syntax_rules ~data in
@@ -80,13 +80,13 @@ let ellipsis_matcher_tests =
         let data = parse "(1 2 3)" in
         let actual = M.match_syntax_rules ~syntax_rules ~data in
         let leveled =
-          [
-            M.Pattern_matcher.(make () |> put_pattern_variable "a" (T.Number "1"));
-            M.Pattern_matcher.(make () |> put_pattern_variable "a" (T.Number "2"));
-            M.Pattern_matcher.(make () |> put_pattern_variable "a" (T.Number "3"));
-          ]
+          M.Pattern_matcher.(
+            make ()
+            |> put_pattern_variable ("a", 1) (T.Number "1")
+            |> put_pattern_variable ("a", 1) (T.Number "2")
+            |> put_pattern_variable ("a", 1) (T.Number "3"))
         in
-        let expected = Some (M.Pattern_matcher.(make () |> set_level leveled), List.hd syntax_rules.syntax_rules) in
+        let expected = Some (leveled, List.hd syntax_rules.syntax_rules) in
 
         Alcotest.(check result_t) "matched" expected actual);
     Alcotest.test_case "match the ellipsis pattern that have before pattern" `Quick (fun () ->
@@ -94,16 +94,14 @@ let ellipsis_matcher_tests =
         let data = parse "(1 2 3)" in
         let actual = M.match_syntax_rules ~syntax_rules ~data in
         let leveled =
-          [
-            M.Pattern_matcher.(make () |> put_pattern_variable "a" (T.Number "2"));
-            M.Pattern_matcher.(make () |> put_pattern_variable "a" (T.Number "3"));
-          ]
+          M.Pattern_matcher.(
+            make ()
+            |> put_pattern_variable ("a", 1) (T.Number "2")
+            |> put_pattern_variable ("a", 1) (T.Number "3")
+            |> put_pattern_variable ("b", 0) (T.Number "1"))
         in
-        let expected =
-          Some
-            ( M.Pattern_matcher.(make () |> set_level leveled |> put_pattern_variable "b" (T.Number "1")),
-              List.hd syntax_rules.syntax_rules )
-        in
+
+        let expected = Some (leveled, List.hd syntax_rules.syntax_rules) in
 
         Alcotest.(check result_t) "matched" expected actual);
     Alcotest.test_case "match the ellipsis pattern that have after pattern" `Quick (fun () ->
@@ -111,16 +109,13 @@ let ellipsis_matcher_tests =
         let data = parse "(1 2 3)" in
         let actual = M.match_syntax_rules ~syntax_rules ~data in
         let leveled =
-          [
-            M.Pattern_matcher.(make () |> put_pattern_variable "a" (T.Number "1"));
-            M.Pattern_matcher.(make () |> put_pattern_variable "a" (T.Number "2"));
-          ]
+          M.Pattern_matcher.(
+            make ()
+            |> put_pattern_variable ("a", 1) (T.Number "1")
+            |> put_pattern_variable ("a", 1) (T.Number "2")
+            |> put_pattern_variable ("b", 0) (T.Number "3"))
         in
-        let expected =
-          Some
-            ( M.Pattern_matcher.(make () |> set_level leveled |> put_pattern_variable "b" (T.Number "3")),
-              List.hd syntax_rules.syntax_rules )
-        in
+        let expected = Some (leveled, List.hd syntax_rules.syntax_rules) in
 
         Alcotest.(check result_t) "matched" expected actual);
     Alcotest.test_case "match a pattern variable as a list" `Quick (fun () ->
@@ -130,7 +125,7 @@ let ellipsis_matcher_tests =
         let expected =
           Some
             ( M.Pattern_matcher.(
-                make () |> put_pattern_variable "b" (T.Number "3") |> put_pattern_variable "a" (parse "(1 2)")),
+                make () |> put_pattern_variable ("b", 0) (T.Number "3") |> put_pattern_variable ("a", 0) (parse "(1 2)")),
               List.hd syntax_rules.syntax_rules )
         in
 
