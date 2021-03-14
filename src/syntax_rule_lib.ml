@@ -414,13 +414,8 @@ module Rule_parser = struct
     let open L.Infix in
     let* ellipsis = L.(ellipsis <|> L.pure None) in
     let* literals = literals in
-    print_endline @@ Printf.sprintf "parsed literals:%s" @@ String.concat ";" literals;
     let p = list >>= lift syntax_rule in
     let* syntax_rules = L.many1 p in
-    Result.fold
-      ~ok:(fun v -> L.pure v)
-      ~error:(fun e ->
-        Printf.printf "%s\n" e;
-        L.zero)
+    Result.fold ~ok:(fun v -> L.pure v) ~error:(fun _ -> L.zero)
     @@ Syntax_rules.make ?ellipsis ~literals ~syntax_rules ()
 end
