@@ -246,16 +246,18 @@ module Syntax_rules = struct
       match template with
       | T.Number _ | T.False | T.True -> Ok rule
       | T.Symbol v when v = ellipsis -> Error "Invalid template: ellipsis used as unaided"
-      | T.Symbol v -> if List.mem v variables_in_level then Ok rule else Error (Printf.sprintf "Invalid level: %s" v)
+      | T.Symbol v when level > 0 ->
+          if List.mem v variables_in_level then Ok rule else Error (Printf.sprintf "Invalid level: %s" v)
+      | T.Symbol _ -> Ok rule
       | T.Cons (T.Symbol e, T.Cons (T.Symbol e', T.Empty_list)) when e = ellipsis && e' = ellipsis -> Ok rule
       | T.Cons (v, T.Cons (T.Symbol e, rest)) when e = ellipsis ->
           let* _ = validate_template' (succ level) v in
           validate_template' level rest
       | T.Cons (v, rest) ->
-          let* _ = validate_template' (succ level) v in
+          let* _ = validate_template' level v in
           validate_template' level rest
       | T.Empty_list -> Ok rule
-      | _ -> Error "Invalid syntax"
+      | _ as v -> Error (Printf.sprintf "Invalid syntax: %s" @@ Pr.print v)
     in
     validate_template' 0 @@ Syntax_rule.template rule
 
@@ -412,8 +414,13 @@ module Rule_parser = struct
     let open L.Infix in
     let* ellipsis = L.(ellipsis <|> L.pure None) in
     let* literals = literals in
+    print_endline @@ Printf.sprintf "parsed literals:%s" @@ String.concat ";" literals;
     let p = list >>= lift syntax_rule in
     let* syntax_rules = L.many1 p in
-    Result.fold ~ok:(fun v -> L.pure v) ~error:(fun _ -> L.zero)
+    Result.fold
+      ~ok:(fun v -> L.pure v)
+      ~error:(fun e ->
+        Printf.printf "%s\n" e;
+        L.zero)
     @@ Syntax_rules.make ?ellipsis ~literals ~syntax_rules ()
 end
