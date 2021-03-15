@@ -11,7 +11,7 @@ let rec to_string = function
   | Empty_list      -> "()"
   | Primitive_fun _ -> "<#proc ...>"
   | Closure _       -> "<#closure ...>"
-  | Syntax_fun _    -> "<#syntax ...>"
+  | Syntax _        -> "<#syntax ...>"
 
 and cons_to_string accum = function
   | Cons (v, (Cons _ as rest)) -> cons_to_string (v :: accum) rest
