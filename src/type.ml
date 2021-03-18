@@ -37,7 +37,7 @@ and macro = data -> data evaluation_result
 and binding =
   | Value        of data
   | Special_form of special_form
-  | Macro        of macro
+  | Macro        of special_form
 
 let is_cons = function Cons _ -> true | _ -> false
 

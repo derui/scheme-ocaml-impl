@@ -10,7 +10,7 @@ let eval_symbol env sym =
       match v with
       | T.Value v           -> Ok v
       | T.Special_form form -> Ok (T.Syntax form)
-      | T.Macro macro       -> Ok (T.Syntax (fun _ -> macro)) )
+      | T.Macro macro       -> Ok (T.Syntax macro) )
 
 let eval_primitive _ v = Ok v
 
