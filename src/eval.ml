@@ -6,7 +6,11 @@ let is_primitive = function T.Number _ | True | False | Empty_list -> true | _ -
 let eval_symbol env sym =
   match E.get env ~key:sym with
   | None   -> T.raise_error @@ Printf.sprintf "%s is not bound" sym
-  | Some v -> ( match v with T.Value v -> Ok v | T.Special_form form -> Ok (T.Syntax_fun form) )
+  | Some v -> (
+      match v with
+      | T.Value v           -> Ok v
+      | T.Special_form form -> Ok (T.Syntax form)
+      | T.Macro macro       -> Ok (T.Syntax macro) )
 
 let eval_primitive _ v = Ok v
 
@@ -31,7 +35,7 @@ and eval_list env v =
   match v with
   | T.Cons (Symbol sym, arg) -> (
       let* v = eval_symbol env sym in
-      match v with T.Syntax_fun f -> f env arg | _ -> eval_combo env v arg )
+      match v with T.Syntax f -> f env arg | _ -> eval_combo env v arg )
   | T.Cons (car, cdr)        ->
       let* car = eval env car in
       let* arg = eval_list env cdr in

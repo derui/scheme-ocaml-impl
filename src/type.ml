@@ -23,18 +23,21 @@ type data =
       argument_formal : argument_formal;
       body : data;
     }
-  | Primitive_fun of primitive_closure
-  | Syntax_fun    of special_form
+  | Primitive_fun of primitive_fun
+  | Syntax        of special_form
 
 and special_form = env -> data -> data evaluation_result
 
-and primitive_closure = argument_formal * (data -> data evaluation_result)
+and primitive_fun = argument_formal * (data -> data evaluation_result)
 
 and env = binding Environment.t
+
+and macro = data -> data evaluation_result
 
 and binding =
   | Value        of data
   | Special_form of special_form
+  | Macro        of special_form
 
 let is_cons = function Cons _ -> true | _ -> false
 

@@ -15,7 +15,10 @@ let initialize_global_env env =
   Environment.set env ~key:"let" ~v:(T.Special_form Special_form.Export.eval_let) |> ignore;
   Environment.set env ~key:"quote" ~v:(T.Special_form Special_form.Export.eval_quote) |> ignore;
   Environment.set env ~key:"unquote" ~v:(T.Special_form Special_form.Export.eval_unquote) |> ignore;
-  Environment.set env ~key:"quasiquote" ~v:(T.Special_form Special_form.Export.eval_quasiquote) |> ignore
+  Environment.set env ~key:"quasiquote" ~v:(T.Special_form Special_form.Export.eval_quasiquote) |> ignore;
+  Environment.set env ~key:"define-syntax" ~v:(T.Special_form Syntax_transformer.eval_define_syntax) |> ignore;
+  Environment.set env ~key:"syntax-rules" ~v:(T.Special_form (fun _ data -> Syntax_transformer.eval_syntax_rules data))
+  |> ignore
 
 let run () =
   let env = Environment.make [] in
