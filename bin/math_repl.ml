@@ -3,8 +3,13 @@ module T = Type
 module E = Environment
 
 let print = function
-  | Error e -> Printf.printf "Error occurred:\n    %s\n" e
-  | Ok v    -> Printf.printf "%s\n" @@ Printer.print v
+  | Error (T.Error_obj { message; irritants; _ }) ->
+      let irritants = " " ^ (List.map Printer.print irritants |> String.concat " ") in
+      Printf.printf "Error occurred:\n    %s%s\n" message irritants
+  | Error (T.Syntax_error { message; args }) ->
+      let irritants = " " ^ (List.map Printer.print args |> String.concat " ") in
+      Printf.printf "Error occurred:\n    %s%s\n" message irritants
+  | Ok v -> Printf.printf "%s\n" @@ Printer.print v
 
 let initialize_global_env env =
   Environment.set env ~key:"+" ~v:(T.Value (T.Primitive_fun Primitive_op.Number_op.Export.plus)) |> ignore;

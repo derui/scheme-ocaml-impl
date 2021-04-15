@@ -3,7 +3,9 @@ module T = Type
 
 let eval_define env v =
   let open Lib.Result.Let_syntax in
-  let* sym, v = match v with T.Cons (Symbol sym, Cons (v, Empty_list)) -> Ok (sym, v) | _ -> Error "Invalid syntax" in
+  let* sym, v =
+    match v with T.Cons (Symbol sym, Cons (v, Empty_list)) -> Ok (sym, v) | _ -> T.raise_syntax_error "Invalid syntax"
+  in
   let* value = Eval.eval env v in
   E.set env ~key:sym ~v:(T.Value value);
   Result.ok value
@@ -13,14 +15,16 @@ let eval_if env = function
       let open Lib.Result.Let_syntax in
       let* cond = Eval.eval env cond in
       match cond with T.False -> Eval.eval env when_false | _ -> Eval.eval env when_true )
-  | _ as v -> Error (Printf.sprintf "Invalid syntax %s\n" @@ Printer.print v)
+  | _ as v -> T.raise_error ~irritants:[ v ] (Printf.sprintf "Invalid syntax %s\n" @@ Printer.print v)
 
 let eval_set_force env v =
   let open Lib.Result.Let_syntax in
-  let* sym, v = match v with T.Cons (Symbol sym, Cons (v, Empty_list)) -> Ok (sym, v) | _ -> Error "Invalid syntax" in
+  let* sym, v =
+    match v with T.Cons (Symbol sym, Cons (v, Empty_list)) -> Ok (sym, v) | _ -> T.raise_syntax_error "Invalid syntax"
+  in
   let* value = Eval.eval env v in
   match E.replace env ~key:sym ~v:(T.Value value) with
-  | None    -> Error (Printf.sprintf "%s is not defined" sym)
+  | None    -> T.raise_error ~irritants:[ v ] (Printf.sprintf "%s is not defined" sym)
   | Some () -> Result.ok value
 
 let rec eval_sequence env bodies =

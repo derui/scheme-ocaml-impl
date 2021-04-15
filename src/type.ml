@@ -1,15 +1,21 @@
 type argument_formal =
   | Fixed         of string list
   | Any           of string
-  | Fixed_and_any of string list * string
+  | Fixed_and_any of string list * string  (** The syntax of scheme *)
 
-type scheme_error = string
+type error_kind =
+  | Normal
+  | Read
+  | File
 
-type 'a evaluation_result = ('a, scheme_error) result
+module Error_kind = struct
+  type t = error_kind
 
-let raise_error error = Error error
+  let show = function Normal -> "normal" | Read -> "read" | File -> "file"
 
-(** The syntax of scheme *)
+  let pp fmt t = Format.fprintf fmt "%s" @@ show t
+end
+
 type data =
   | Symbol        of string
   | Number        of string
@@ -38,6 +44,34 @@ and binding =
   | Value        of data
   | Special_form of special_form
   | Macro        of special_form
+
+and scheme_error =
+  | Error_obj    of {
+      error_kind : error_kind;
+      message : string;
+      irritants : data list;
+    }
+  | Syntax_error of {
+      message : string;
+      args : data list;
+    }
+
+and 'a evaluation_result = ('a, scheme_error) result
+
+let raise_error ?irritants error =
+  Error (Error_obj { message = error; error_kind = Normal; irritants = Option.value irritants ~default:[] })
+
+let raise_syntax_error ?args error = Error (Syntax_error { message = error; args = Option.value args ~default:[] })
+
+module Scheme_error = struct
+  type t = scheme_error
+
+  let show = function
+    | Error_obj { error_kind; message; _ } -> Printf.sprintf "Error(%s): %s" (Error_kind.show error_kind) message
+    | Syntax_error { message; _ }          -> Printf.sprintf "Syntax: %s" message
+
+  let pp fmt t = Format.fprintf fmt "%s" @@ show t
+end
 
 let is_cons = function Cons _ -> true | _ -> false
 

@@ -15,7 +15,7 @@ let parse str = Lexing.from_string str |> Ocaml_scheme.(Parser.program Ocaml_sch
 
 let parse_rule str =
   let v = parse str |> S.Rule_parser.syntax_rules |> Result.map fst in
-  match v with Error e -> failwith e | Ok v -> v
+  match v with Error _ -> Alcotest.fail "failed" | Ok v -> v
 
 let test_cases =
   [
