@@ -12,7 +12,7 @@
 
 %%
 
-/* should implement from http://www.unixuser.org/~euske/doc/r5rs-ja/r5rs-ja.pdf */
+/* should implement from http://www.unixuser.org/~euske/doc/r5rs-ja/r7rs-ja.pdf */
 
 program:
   | exp* EOF { $1 }
