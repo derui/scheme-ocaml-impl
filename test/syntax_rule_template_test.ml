@@ -22,7 +22,38 @@ let test_cases =
     ("(() ((_ a b) (a a b b)))", "(1 2)", "(1 1 2 2)");
     ("(() ((_ a b) a))", "(1 2)", "1");
     ("(() ((_ a b) ((a) b)))", "(1 2)", "((1) 2)");
+    ("(() ((_ (a b)) ((a) b)))", "((1 2))", "((1) 2)");
+    ("(() ((_ a b ...) ((a) b ...)))", "(1 2 3)", "((1) 2 3)");
+    ("(() ((_ (a b ...)) ((a) b ...)))", "((1 2 3))", "((1) 2 3)");
     ("(() ((_ a) (+ (* a a) (- a 1))))", "(2)", "(+ (* 2 2) (- 2 1))");
+    ( {|
+((else =>)
+   ((cond (else result1 result2 ...))
+    (begin result1 result2 ...))
+   ((cond (test => result))
+    (let ((temp test))
+      (if temp (result temp))))
+   ((cond (test => result clause1 clause2 ...))
+    (let ((temp test))
+      (if temp
+          (result temp)
+          (cond clause1 clause2 ...))))
+   ((cond (test)) test)
+   ((cond (test) clause1 clause2 ...)
+    (let ((temp test))
+      (if temp
+          temp
+          (cond clause1 clause2 ...))))
+   ((cond (test result1 result2 ...))
+    (if test (begin result1 result2 ...)))
+   ((cond (test result1 result2 ...)
+          clause1 clause2 ...)
+    (if test
+        (begin result1 result2 ...)
+        (cond clause1 clause2 ...))))
+      |},
+      "((else 1 2 3))",
+      "(begin 1 2 3)" );
   ]
 
 let to_test (rules, list, expanded) =

@@ -27,6 +27,9 @@ let expand matcher ellipsis template =
         let accum = expand' matcher (succ level) v |> apply_expanded accum in
         expand_list' matcher level accum rest
     (* ellipsis at before dot *)
+    | T.Cons (v, T.Cons (T.Symbol e, Empty_list)) when e = ellipsis ->
+        let accum = expand' matcher (succ level) v |> apply_expanded accum |> reverse in
+        accum
     | T.Cons (v, T.Cons (T.Symbol e, rest)) when e = ellipsis ->
         let accum = expand' matcher (succ level) v |> apply_expanded accum |> reverse in
         let dot = expand' matcher level rest |> List.hd in
