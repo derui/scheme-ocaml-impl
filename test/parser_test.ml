@@ -75,4 +75,8 @@ let tests =
           [ T.Cons (Symbol "a", Cons (Number "1", Empty_list)); T.Cons (Symbol "b", Cons (Number "2", Empty_list)) ]
         in
         Alcotest.(check @@ list data) "program" actual expected);
+    Alcotest.test_case "ignore line comment" `Quick (fun () ->
+        let actual = Lexing.from_string ";;(a 1) \n(b 2)" |> P.program L.token in
+        let expected = [ T.Cons (Symbol "b", Cons (Number "2", Empty_list)) ] in
+        Alcotest.(check @@ list data) "program" actual expected);
   ]

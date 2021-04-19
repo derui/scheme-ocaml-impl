@@ -19,10 +19,12 @@ let symbol_rest = alphabet | special_char | dot | numeric
 let quasiquote = '`'
 let quote = '\''
 let comma = ','
+let line_comment = ';'
 
 rule token = parse
   | '\n' {Lexing.new_line lexbuf; token lexbuf}
   | whitespace+ { token lexbuf }
+  | line_comment { line_comment lexbuf }
   | left_paren { LEFT_PAREN }
   | right_paren { RIGHT_PAREN }
   | bool_true { BOOL_TRUE }
@@ -37,3 +39,6 @@ rule token = parse
 (* this number lexer supports only little subset of Schema's number *)
   | numeric+ {NUMBER (Lexing.lexeme lexbuf)}
   | eof {EOF}
+and line_comment = parse
+  | '\n' {Lexing.new_line lexbuf; token lexbuf}
+  | _ { line_comment lexbuf }
