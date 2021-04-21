@@ -3,7 +3,9 @@ module T = Type
 
 let eval_define env v =
   let open Lib.Result.Let_syntax in
-  let* sym, v = match v with T.Cons (Symbol sym, Cons (v, Empty_list)) -> Ok (sym, v) | _ -> Error "Invalid syntax" in
+  let* sym, v =
+    match v with T.Cons (Symbol sym, Cons (v, Empty_list)) -> Ok (sym, v) | _ -> T.raise_syntax_error "Invalid syntax"
+  in
   let* value = Eval.eval env v in
   E.set env ~key:sym ~v:(T.Value value);
   Result.ok value
@@ -13,14 +15,16 @@ let eval_if env = function
       let open Lib.Result.Let_syntax in
       let* cond = Eval.eval env cond in
       match cond with T.False -> Eval.eval env when_false | _ -> Eval.eval env when_true )
-  | _ as v -> Error (Printf.sprintf "Invalid syntax %s\n" @@ Printer.print v)
+  | _ as v -> T.raise_error ~irritants:[ v ] (Printf.sprintf "Invalid syntax %s\n" @@ Printer.print v)
 
 let eval_set_force env v =
   let open Lib.Result.Let_syntax in
-  let* sym, v = match v with T.Cons (Symbol sym, Cons (v, Empty_list)) -> Ok (sym, v) | _ -> Error "Invalid syntax" in
+  let* sym, v =
+    match v with T.Cons (Symbol sym, Cons (v, Empty_list)) -> Ok (sym, v) | _ -> T.raise_syntax_error "Invalid syntax"
+  in
   let* value = Eval.eval env v in
   match E.replace env ~key:sym ~v:(T.Value value) with
-  | None    -> Error (Printf.sprintf "%s is not defined" sym)
+  | None    -> T.raise_error ~irritants:[ v ] (Printf.sprintf "%s is not defined" sym)
   | Some () -> Result.ok value
 
 let rec eval_sequence env bodies =
@@ -32,32 +36,6 @@ let rec eval_sequence env bodies =
       let* _ = Eval.eval env v in
       eval_sequence env bodies
   | _                    -> Ok T.Empty_list
-
-let eval_let env v =
-  let open Lib.Result.Let_syntax in
-  let* bindings, body =
-    match v with
-    | T.Cons (bindings, body) ->
-        let rec get_bindings bindings rest =
-          match rest with
-          | T.Empty_list -> Ok bindings
-          | Cons (Cons (Symbol sym, Cons (value, Empty_list)), rest) -> get_bindings ((sym, value) :: bindings) rest
-          | _ -> T.raise_error @@ Printf.sprintf "Syntax error: malformed let: %s" @@ Printer.print v
-        in
-        let* bindings = get_bindings [] bindings in
-        Ok (bindings, body)
-    | _                       -> T.raise_error @@ Printf.sprintf "Syntax error: need bindings: %s" @@ Printer.print v
-  in
-  let* bindings =
-    List.fold_left
-      (fun accum (key, v) ->
-        let* accum = accum in
-        let* v = Eval.eval env v in
-        (key, T.Value v) :: accum |> Result.ok)
-      (Ok []) bindings
-  in
-  let new_env = E.make ~parent_env:env bindings in
-  eval_sequence new_env body
 
 let eval_lambda env v =
   let open Lib.Result.Let_syntax in
@@ -131,8 +109,6 @@ module Export = struct
   let eval_if = eval_if
 
   let eval_set_force = eval_set_force
-
-  let eval_let = eval_let
 
   let eval_lambda = eval_lambda
 

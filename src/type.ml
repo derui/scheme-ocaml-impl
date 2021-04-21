@@ -1,21 +1,104 @@
 type argument_formal =
   | Fixed         of string list
   | Any           of string
-  | Fixed_and_any of string list * string
+  | Fixed_and_any of string list * string  (** The syntax of scheme *)
 
-type scheme_error = string
+type error_kind =
+  | Normal
+  | Read
+  | File
 
-type 'a evaluation_result = ('a, scheme_error) result
+module Error_kind = struct
+  type t = error_kind
 
-let raise_error error = Error error
+  let show = function Normal -> "normal" | Read -> "read" | File -> "file"
 
-(** The syntax of scheme *)
+  let pp fmt t = Format.fprintf fmt "%s" @@ show t
+end
+
+module Scheme_char = struct
+  type escape_sequence =
+    | Alarm
+    | Backspace
+    | Tab
+    | New_line
+    | Carriage_return
+    | Double_quote
+    | Pipe
+    | Scalar          of Int64.t * string
+
+  type t =
+    | Escape_sequence of escape_sequence
+    | Char            of string
+
+  (* this character holds a byte *)
+
+  let alarm = Escape_sequence Alarm
+
+  let backspace = Escape_sequence Backspace
+
+  let tab = Escape_sequence Tab
+
+  let new_line = Escape_sequence New_line
+
+  let carriage_return = Escape_sequence Carriage_return
+
+  let double_quote = Escape_sequence Double_quote
+
+  let pipe = Escape_sequence Pipe
+
+  let scalar v original = Escape_sequence (Scalar (v, original))
+
+  let hex_of_char = function
+    | ('0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9') as v -> int_of_char v
+    | ('A' | 'B' | 'C' | 'D' | 'E' | 'F') as v -> 10 + (int_of_char v - int_of_char 'A')
+    | ('a' | 'b' | 'c' | 'd' | 'e' | 'f') as v -> 10 + (int_of_char v - int_of_char 'a')
+    | _ -> failwith "invalid hex character"
+
+  let char_of_hex = function
+    | (0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9) as v -> char_of_int (v + int_of_char '0')
+    | (10 | 11 | 12 | 13 | 14 | 15) as v -> char_of_int (v + int_of_char 'A')
+    | _ -> failwith "invalid hex value"
+
+  let of_string = function
+    | "\\a"  -> alarm
+    | "\\b"  -> backspace
+    | "\\t"  -> tab
+    | "\\n"  -> new_line
+    | "\\r"  -> carriage_return
+    | "\\\"" -> double_quote
+    | "\\|"  -> pipe
+    | _ as v ->
+        if String.index_opt v '\\' = Some 0 && String.index_opt v 'x' = Some 1 && String.rindex_opt v ';' = Some 0 then (
+          let v = String.sub v 2 (String.length v - 3) in
+          let buf = ref Int64.zero in
+          String.iter
+            (fun c ->
+              let hex = hex_of_char c |> Int64.of_int in
+              buf := Int64.(add (shift_left !buf 8) hex))
+            v;
+          scalar !buf v )
+        else Char v
+
+  let to_string = function
+    | Escape_sequence Alarm                  -> "\\a"
+    | Escape_sequence Backspace              -> "\\b"
+    | Escape_sequence Tab                    -> "\\t"
+    | Escape_sequence New_line               -> "\\n"
+    | Escape_sequence Carriage_return        -> "\\r"
+    | Escape_sequence Double_quote           -> "\\\""
+    | Escape_sequence Pipe                   -> "\\|"
+    | Escape_sequence (Scalar (_, original)) -> "\\x" ^ original ^ ";"
+    | Char v                                 -> v
+end
+
 type data =
   | Symbol        of string
   | Number        of string
   | Cons          of data * data
   | True
   | False
+  | Scheme_string of Scheme_char.t list
   (* Empty list should be specialized. *)
   | Empty_list
   | Closure       of {
@@ -38,6 +121,34 @@ and binding =
   | Value        of data
   | Special_form of special_form
   | Macro        of special_form
+
+and scheme_error =
+  | Error_obj    of {
+      error_kind : error_kind;
+      message : string;
+      irritants : data list;
+    }
+  | Syntax_error of {
+      message : string;
+      args : data list;
+    }
+
+and 'a evaluation_result = ('a, scheme_error) result
+
+let raise_error ?irritants error =
+  Error (Error_obj { message = error; error_kind = Normal; irritants = Option.value irritants ~default:[] })
+
+let raise_syntax_error ?args error = Error (Syntax_error { message = error; args = Option.value args ~default:[] })
+
+module Scheme_error = struct
+  type t = scheme_error
+
+  let show = function
+    | Error_obj { error_kind; message; _ } -> Printf.sprintf "Error(%s): %s" (Error_kind.show error_kind) message
+    | Syntax_error { message; _ }          -> Printf.sprintf "Syntax: %s" message
+
+  let pp fmt t = Format.fprintf fmt "%s" @@ show t
+end
 
 let is_cons = function Cons _ -> true | _ -> false
 

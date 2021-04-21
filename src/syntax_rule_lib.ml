@@ -11,7 +11,7 @@ end)
    parsing syntax-rule. *)
 module List_parser = struct
   (* The type of parser *)
-  type 'a t = T.data -> ('a * T.data, string) result
+  type 'a t = T.data -> ('a * T.data, T.scheme_error) result
 
   let map : ('a -> 'b) -> 'a t -> 'b t =
    fun f p data -> match p data with Error _ as v -> v | Ok (v, rest) -> Ok (f v, rest)
@@ -47,23 +47,23 @@ module List_parser = struct
   let ( *< ) p p2 = Infix.((fun x _ -> x) <$> p <*> p2)
 
   let element = function
-    | T.Empty_list               -> Error "end of list"
+    | T.Empty_list               -> T.raise_syntax_error "end of list"
     | Cons (v, (Cons _ as rest)) -> Ok (v, rest)
     | Cons (v, T.Empty_list)     -> Ok (v, Empty_list)
     | Cons (v, k)                -> Ok (v, k)
-    | _ as v                     -> Error (Printf.sprintf "malformed list: %s" @@ Pr.print v)
+    | _ as v                     -> T.raise_syntax_error (Printf.sprintf "malformed list: %s" @@ Pr.print v)
 
   let cdr = function
-    | T.Empty_list -> Error "should be end"
-    | Cons _       -> Error "not malformed list"
+    | T.Empty_list -> T.raise_syntax_error "should be end"
+    | Cons _       -> T.raise_syntax_error "not malformed list"
     | v            -> Ok (v, T.Empty_list)
 
-  let zero v = Error (Printf.sprintf "empty: %s" @@ Pr.print v)
+  let zero v = T.raise_syntax_error (Printf.sprintf "empty: %s" @@ Pr.print v)
 
   let choice p q data =
     let p = p data in
     let q = q data in
-    match (p, q) with Error _, Error _ -> Error "can not choice" | Error _, Ok v | Ok v, _ -> Ok v
+    match (p, q) with Error _, Error _ -> T.raise_syntax_error "can not choice" | Error _, Ok v | Ok v, _ -> Ok v
 
   (* combinator to choice *)
   let ( <|> ) = choice
@@ -210,7 +210,7 @@ module Syntax_rules = struct
     let rec validate_rule_pattern' = function
       | Pattern.Nest patterns            ->
           let count = ellipsis_count patterns in
-          let* _ = if count > 1 then Error "Ellipsis cound not contains in same pattern" else Ok () in
+          let* _ = if count > 1 then T.raise_error "Ellipsis cound not contains in same pattern" else Ok () in
           List.fold_left
             (fun accum v ->
               let* () = accum in
@@ -218,7 +218,7 @@ module Syntax_rules = struct
             (Ok ()) patterns
       | Pattern.Nest_dot (patterns, dot) ->
           let count = ellipsis_count patterns in
-          let* _ = if count > 1 then Error "Ellipsis cound not contains in same pattern" else Ok () in
+          let* _ = if count > 1 then T.raise_error "Ellipsis cound not contains in same pattern" else Ok () in
           let* () =
             List.fold_left
               (fun accum v ->
@@ -232,7 +232,7 @@ module Syntax_rules = struct
     let* () =
       match Syntax_rule.pattern rule with
       | Pattern.Nest _ | Pattern.Nest_dot _ -> Syntax_rule.pattern rule |> validate_rule_pattern'
-      | _                                   -> Error "Pattern must be list"
+      | _                                   -> T.raise_error "Pattern must be list"
     in
     Ok rule
 
@@ -245,9 +245,9 @@ module Syntax_rules = struct
       in
       match template with
       | T.Number _ | T.False | T.True -> Ok rule
-      | T.Symbol v when v = ellipsis -> Error "Invalid template: ellipsis used as unaided"
+      | T.Symbol v when v = ellipsis -> T.raise_error "Invalid template: ellipsis used as unaided"
       | T.Symbol v when level > 0 ->
-          if List.mem v variables_in_level then Ok rule else Error (Printf.sprintf "Invalid level: %s" v)
+          if List.mem v variables_in_level then Ok rule else T.raise_error (Printf.sprintf "Invalid level: %s" v)
       | T.Symbol _ -> Ok rule
       | T.Cons (T.Symbol e, T.Cons (T.Symbol e', T.Empty_list)) when e = ellipsis && e' = ellipsis -> Ok rule
       | T.Cons (v, T.Cons (T.Symbol e, rest)) when e = ellipsis ->
@@ -257,7 +257,7 @@ module Syntax_rules = struct
           let* _ = validate_template' level v in
           validate_template' level rest
       | T.Empty_list -> Ok rule
-      | _ as v -> Error (Printf.sprintf "Invalid syntax: %s" @@ Pr.print v)
+      | _ as v -> T.raise_error (Printf.sprintf "Invalid syntax: %s" @@ Pr.print v)
     in
     validate_template' 0 @@ Syntax_rule.template rule
 
@@ -274,7 +274,7 @@ module Syntax_rules = struct
     let symbols = collect_symbols [] (Syntax_rule.pattern rule) in
     let uniq_symbols = List.sort_uniq String.compare symbols in
     if List.length symbols <> List.length uniq_symbols then
-      Error "Found some pattern variables appears more than once in the definition"
+      T.raise_error "Found some pattern variables appears more than once in the definition"
     else Ok rule
 
   let validate_syntax_rule literals ellipsis rule =

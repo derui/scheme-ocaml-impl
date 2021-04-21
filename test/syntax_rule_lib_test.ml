@@ -6,7 +6,9 @@ let exp_pp = Alcotest.testable Pr.pp ( = )
 
 let element_p = Alcotest.(of_pp Pr.pp)
 
-let parser_pp p = Alcotest.(result (pair p exp_pp) string)
+let error_t = Alcotest.testable T.Scheme_error.pp ( = )
+
+let parser_pp p = Alcotest.(result (pair p exp_pp) error_t)
 
 let list_to_scheme_list v = List.rev v |> List.fold_left (fun accum v -> T.Cons (v, accum)) T.Empty_list
 
@@ -64,7 +66,7 @@ let list_parser_tests =
 
 let pattern_parser_test =
   let pattern_p = Alcotest.of_pp S.Pattern.pp in
-  let rule_pp = Alcotest.(result (pair pattern_p exp_pp) string) in
+  let rule_pp = Alcotest.(result (pair pattern_p exp_pp) error_t) in
   let module P = S.Pattern in
   [
     Alcotest.test_case "Rule Parser: parse the simplest pattern" `Quick (fun () ->
@@ -103,7 +105,7 @@ let pattern_parser_test =
 
 let syntax_rule_parser_test =
   let pattern_p = Alcotest.of_pp S.Pattern.pp in
-  let rule_pp = Alcotest.(result (pair (pair pattern_p exp_pp) exp_pp) string) in
+  let rule_pp = Alcotest.(result (pair (pair pattern_p exp_pp) exp_pp) error_t) in
   let module P = S.Pattern in
   [
     Alcotest.test_case "Syntax rule Parser: parse the simplest rule" `Quick (fun () ->
@@ -136,7 +138,7 @@ let syntax_rules_parser_test =
         let actual = S.Rule_parser.syntax_rules list in
         let rule = (P.Nest [], T.Number "1") in
         let expected = Ok (S.Syntax_rules.make ~syntax_rules:[ rule ] () |> Result.get_ok, T.Empty_list) in
-        Alcotest.(check @@ result test_rule string) "simple" expected actual);
+        Alcotest.(check @@ result test_rule error_t) "simple" expected actual);
   ]
 
 let syntax_rule_test =
@@ -149,19 +151,19 @@ let syntax_rule_test =
           S.Rule_parser.syntax_rule list |> Result.map (fun (v, _) -> S.Syntax_rule.pattern_variables [] v)
         in
         let expected = Ok [] in
-        Alcotest.(check @@ result (list @@ pair int string) string) "simple" expected actual);
+        Alcotest.(check @@ result (list @@ pair int string) error_t) "simple" expected actual);
     Alcotest.test_case "Syntax rule: allow nest in template" `Quick (fun () ->
         let list = "((_ a b c) (+ (+ a b) (* b c)))" |> parse in
         let actual = S.Rule_parser.syntax_rule list |> Result.map (fun v -> fst v |> snd) in
         let expected = Ok (parse "(+ (+ a b) (* b c))") in
-        Alcotest.(check @@ result element_p string) "nested" expected actual);
+        Alcotest.(check @@ result element_p error_t) "nested" expected actual);
     Alcotest.test_case "Syntax rule: have level 0 pattern variable " `Quick (fun () ->
         let list = "((_ b 2 3) 5)" |> parse in
         let actual =
           S.Rule_parser.syntax_rule list |> Result.map (fun (v, _) -> S.Syntax_rule.pattern_variables [] v)
         in
         let expected = Ok [ (0, "b") ] in
-        Alcotest.(check @@ result (list @@ pair int string) string) "simple" expected actual);
+        Alcotest.(check @@ result (list @@ pair int string) error_t) "simple" expected actual);
     Alcotest.test_case "Syntax rule: have level 0 pattern variable with nested" `Quick (fun () ->
         let list = "((_ b (c d) e) 5)" |> parse in
         let actual =
@@ -170,7 +172,7 @@ let syntax_rule_test =
           |> Result.map (List.sort Stdlib.compare)
         in
         let expected = Ok ([ (0, "b"); (0, "c"); (0, "d"); (0, "e") ] |> List.sort Stdlib.compare) in
-        Alcotest.(check @@ result (list @@ pair int string) string) "simple" expected actual);
+        Alcotest.(check @@ result (list @@ pair int string) error_t) "simple" expected actual);
     Alcotest.test_case "Syntax rule: have level 1 pattern variable with ellipsis" `Quick (fun () ->
         let rule = (P.(Nest_ellipsis ([ P.Symbol "a" ], P.Symbol "b", [])), T.Symbol "c") in
         let actual = rule |> S.Syntax_rule.pattern_variables [] |> List.sort Stdlib.compare in
@@ -198,13 +200,13 @@ let syntax_rules_test =
         let actual = S.Rule_parser.syntax_rules list |> Result.map fst in
         let syntax_rules = [ "((a 1 2 3) 5)" |> parse |> S.Rule_parser.syntax_rule |> Result.get_ok |> fst ] in
         let expected = S.Syntax_rules.make ~syntax_rules () in
-        Alcotest.(check @@ result test_syntax_rules string) "simple" expected actual);
+        Alcotest.(check @@ result test_syntax_rules error_t) "simple" expected actual);
     Alcotest.test_case "Syntax rules: create patterns that are contained ellipsis" `Quick (fun () ->
         let list = "(() ((_ b ... 2 3) 5))" |> parse in
         let actual = S.Rule_parser.syntax_rules list |> Result.map fst in
         let syntax_rules = [ "((_ b ... 2 3) 5)" |> parse |> S.Rule_parser.syntax_rule |> Result.get_ok |> fst ] in
         let expected = S.Syntax_rules.make ~syntax_rules () in
-        Alcotest.(check @@ result test_syntax_rules string) "simple" expected actual);
+        Alcotest.(check @@ result test_syntax_rules error_t) "simple" expected actual);
     Alcotest.test_case "Syntax rules: order of rules should be same as appearance order" `Quick (fun () ->
         let list = "(() ((_ a) 5) ((_ b) 6))" |> parse in
         let parse_rule v = parse v |> S.Rule_parser.syntax_rule |> Result.get_ok |> fst in
@@ -217,14 +219,14 @@ let syntax_rules_test =
     Alcotest.test_case "Syntax rules: validate template if have unaided ellipsis" `Quick (fun () ->
         let list = "(() ((_ b ) (...)))" |> parse in
         let actual = S.Rule_parser.syntax_rules list |> Result.map fst in
-        let expected = Error "empty: ()" in
-        Alcotest.(check @@ result test_syntax_rules string) "simple" expected actual);
+        let expected = T.raise_syntax_error "empty: ()" in
+        Alcotest.(check @@ result test_syntax_rules error_t) "simple" expected actual);
     Alcotest.test_case "Syntax rules: allow ellipsis literal" `Quick (fun () ->
         let list = "(() ((_ b ) (... ...)))" |> parse in
         let actual = S.Rule_parser.syntax_rules list |> Result.map fst in
         let syntax_rules = [ "((_ b) (... ...))" |> parse |> S.Rule_parser.syntax_rule |> Result.get_ok |> fst ] in
         let expected = S.Syntax_rules.make ~syntax_rules () in
-        Alcotest.(check @@ result test_syntax_rules string) "simple" expected actual);
+        Alcotest.(check @@ result test_syntax_rules error_t) "simple" expected actual);
     Alcotest.test_case "Syntax rules: complex nested template" `Quick (fun () ->
         let list = "(() ((_ a) (- (+ 1 a) (* 2 a))))" |> parse in
         let parse_rule v = parse v |> S.Rule_parser.syntax_rule |> Result.map fst in
@@ -232,7 +234,7 @@ let syntax_rules_test =
         let actual = S.Rule_parser.syntax_rules list |> Result.map fst in
         let v l n = Result.map (fun l -> List.nth l.S.Syntax_rules.syntax_rules n) l in
 
-        Alcotest.(check @@ result rule_t string) "simple" expected (v actual 0));
+        Alcotest.(check @@ result rule_t error_t) "simple" expected (v actual 0));
   ]
 
 let tests =
