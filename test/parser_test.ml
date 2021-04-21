@@ -79,4 +79,21 @@ let tests =
         let actual = Lexing.from_string ";;(a 1) \n(b 2)" |> P.program L.token in
         let expected = [ T.Cons (Symbol "b", Cons (Number "2", Empty_list)) ] in
         Alcotest.(check @@ list data) "program" actual expected);
+    Alcotest.test_case "simple string" `Quick (fun () ->
+        let actual = Lexing.from_string "\"abcdef\\a\"" |> P.program L.token in
+        let expected =
+          [
+            T.Scheme_string
+              [
+                T.Scheme_char.Char "a";
+                T.Scheme_char.Char "b";
+                T.Scheme_char.Char "c";
+                T.Scheme_char.Char "d";
+                T.Scheme_char.Char "e";
+                T.Scheme_char.Char "f";
+                T.Scheme_char.alarm;
+              ];
+          ]
+        in
+        Alcotest.(check @@ list data) "program" actual expected);
   ]

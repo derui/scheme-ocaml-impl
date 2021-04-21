@@ -4,6 +4,7 @@
 
 %token <string> SYMBOL
 %token <string> NUMBER
+%token <string list> STRING
 %token EOF LEFT_PAREN RIGHT_PAREN BOOL_TRUE BOOL_FALSE
 %token QUASIQUOTE QUOTE UNQUOTE DOT
 %type <data list> program
@@ -23,6 +24,7 @@ exp:
   | BOOL_FALSE { False }
   | BOOL_TRUE { True }
   | scheme_list { $1 }
+  | STRING { Scheme_string (List.map Scheme_char.of_string $1) }
   | QUASIQUOTE exp { Cons (Symbol "quasiquote", Cons ($2, Empty_list)) }
   | QUOTE exp { Cons (Symbol "quote",Cons ($2, Empty_list)) }
   | UNQUOTE exp { Cons (Symbol "unquote", Cons ($2, Empty_list)) }
