@@ -23,7 +23,13 @@ let initialize_global_env env =
   Environment.set env ~key:"define-syntax" ~v:(T.Special_form Syntax_transformer.eval_define_syntax) |> ignore;
   Environment.set env ~key:"let-syntax" ~v:(T.Special_form Syntax_transformer.eval_let_syntax) |> ignore;
   Environment.set env ~key:"syntax-rules" ~v:(T.Special_form (fun _ data -> Syntax_transformer.eval_syntax_rules data))
-  |> ignore
+  |> ignore;
+  let chan = open_in "./scheme/r7rs/base-expressions.scm" in
+  let () =
+    try Lexing.from_channel chan |> Parser.program Lexer.token |> List.map (Eval.eval env) |> ignore
+    with _ as e -> raise e
+  in
+  close_in chan
 
 let run () =
   let env = Environment.make [] in
