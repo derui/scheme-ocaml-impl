@@ -56,7 +56,7 @@ and eval_combo env f arg =
   let* arg = Primitive_op.List_op.reverse arg in
   match f with
   | T.Primitive_fun _ | Closure _ -> eval_apply f arg
-  | _                             -> failwith @@ Printf.sprintf "Illegal path: %s" @@ Printer.print arg
+  | _                             -> T.raise_error @@ Printf.sprintf "Can not apply function: %s" @@ Printer.print arg
 
 and eval_apply closure data =
   let open Lib.Result.Infix in

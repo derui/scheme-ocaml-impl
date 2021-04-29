@@ -92,6 +92,7 @@ module Scheme_char = struct
     | Char v                                 -> v
 end
 
+(** Definitions for data types in schema *)
 type data =
   | Symbol        of string
   | Number        of string
@@ -109,13 +110,14 @@ type data =
   | Primitive_fun of primitive_fun
   | Syntax        of special_form
 
-and special_form = env -> data -> data evaluation_result
+and scheme_fun = data -> data evaluation_result
+(** A type of function in scheme. All scheme's functions has this type. *)
 
-and primitive_fun = argument_formal * (data -> data evaluation_result)
+and special_form = env -> scheme_fun
+
+and primitive_fun = argument_formal * scheme_fun
 
 and env = binding Environment.t
-
-and macro = data -> data evaluation_result
 
 and binding =
   | Value        of data
