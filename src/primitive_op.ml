@@ -1,5 +1,7 @@
-module T = Type
 (** This module provides subset of standard operations. *)
+
+module T = Type
+module D = Data_type
 
 module List_op = struct
   let car arg = match arg with T.Cons (Cons (v, _), _) -> Ok v | _ -> T.raise_error "pair requirement"
@@ -21,13 +23,13 @@ module List_op = struct
     reverse' Empty_list arg
 
   module Export = struct
-    let length = (T.Fixed [ "list" ], length)
+    let length = (D.Argument_formal.Fixed [ "list" ], length)
 
-    let car = (T.Fixed [ "list" ], car)
+    let car = (D.Argument_formal.Fixed [ "list" ], car)
 
-    let cdr = (T.Fixed [ "list" ], cdr)
+    let cdr = (D.Argument_formal.Fixed [ "list" ], cdr)
 
-    let reverse = (T.Fixed [ "list" ], reverse)
+    let reverse = (D.Argument_formal.Fixed [ "list" ], reverse)
   end
 end
 
@@ -48,7 +50,7 @@ module Number_op = struct
     T.Number (string_of_int result) |> Result.ok
 
   module Export = struct
-    let plus = (T.Any "numbers", plus)
+    let plus = (D.Argument_formal.Any "numbers", plus)
   end
 end
 

@@ -1,4 +1,5 @@
 module T = Type
+module D = Data_type
 module E = Environment
 
 let is_primitive = function T.Number _ | True | False | Empty_list -> true | _ -> false
@@ -69,11 +70,11 @@ and eval_apply closure data =
   in
   let to_binding_arguments formal arguments =
     match formal with
-    | T.Fixed symbols              ->
+    | D.Argument_formal.Fixed symbols ->
         let* arguments = argument_to_list [] data in
         List.map2 (fun sym v -> (sym, T.Value v)) symbols arguments |> Result.ok
-    | Any sym                      -> Ok [ (sym, T.Value (Internal_lib.list_to_scheme_list arguments)) ]
-    | Fixed_and_any (symbols, sym) ->
+    | Any sym                         -> Ok [ (sym, T.Value (Internal_lib.list_to_scheme_list arguments)) ]
+    | Fixed_and_any (symbols, sym)    ->
         let* arguments = argument_to_list [] data >>= fun v -> Ok (Array.of_list v) in
         let symbol_len = List.length symbols in
         let rest_length = max 0 (Array.length arguments - symbol_len) in

@@ -1,5 +1,6 @@
 module E = Environment
 module T = Type
+module D = Data_type
 
 let eval_define env v =
   let open Lib.Result.Let_syntax in
@@ -40,7 +41,7 @@ let rec eval_sequence env bodies =
 let eval_lambda env v =
   let open Lib.Result.Let_syntax in
   match v with
-  | T.Cons (Symbol sym, body) -> Ok (T.Closure { env; argument_formal = T.Any sym; body })
+  | T.Cons (Symbol sym, body) -> Ok (T.Closure { env; argument_formal = D.Argument_formal.Any sym; body })
   | Cons (bindings, body)     ->
       let rec get_argument_symbols symbols rest =
         match rest with
@@ -51,7 +52,9 @@ let eval_lambda env v =
       in
       let* arguments, rest_variable = get_argument_symbols [] bindings in
       let argument_formal =
-        match rest_variable with None -> T.Fixed arguments | Some sym -> T.Fixed_and_any (arguments, sym)
+        match rest_variable with
+        | None     -> D.Argument_formal.Fixed arguments
+        | Some sym -> D.Argument_formal.Fixed_and_any (arguments, sym)
       in
       Ok (T.Closure { env; argument_formal; body })
   | _                         -> T.raise_error
