@@ -1,12 +1,11 @@
-type t
-(** type of continuation *)
+(** This module provides type and functions of continuation *)
 
-val make : body:Type.data -> parent_env:Type.binding Environment.t -> symbol:string -> t
-(** [make ~body ~parent_env ~symbol_gen] make a new instance of continuation. *)
+type t = {
+  env : Type.binding Environment.t;
+  previous_continuation : t option;
+  context : Eval_context.t;
+}
+(** The type of continuation. *)
 
-val apply :
-  t ->
-  Type.data ->
-  (Type.binding Environment.t -> Type.data -> Type.data Type.evaluation_result) ->
-  Type.data Type.evaluation_result
-(** [apply t value evaluator] apply continuation with the value. *)
+val make : context:Eval_context.t -> previous_continuation:t option -> env:Type.binding Environment.t -> t
+(** [make ~context ~previous_continuation ~env] make new continuation from values. *)
