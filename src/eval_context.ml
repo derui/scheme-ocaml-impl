@@ -9,25 +9,36 @@ module Evaluated_value_map = Map.Make (struct
 end)
 
 type t = {
-  whole_expression : T.External_representation.t;
-  evaluated_map : T.data Evaluated_value_map.t;
-  evaluated_loc : int;
+  expression : T.data;
+  mutable rest_expression : T.data option;
+  mutable evaluated_stack : T.data list;
 }
 
-let make expr = { whole_expression = expr; evaluated_map = Evaluated_value_map.empty; evaluated_loc = 0 }
+let make expr =
+  assert (T.is_proper_list expr);
+  let rest_expression = match expr with T.Cons _ -> Some expr | _ -> None in
+  { expression = expr; rest_expression; evaluated_stack = [] }
 
-let whole_expression t = t.whole_expression
+let clone t =
+  {
+    expression = t.expression;
+    rest_expression = t.rest_expression;
+    evaluated_stack = List.map (fun v -> v) t.evaluated_stack;
+  }
 
-(** [forward t] force forward evaluated location *)
-let forward t = { t with evaluated_loc = succ t.evaluated_loc }
+let current t =
+  match t.rest_expression with None -> None | Some expr -> ( match expr with T.Cons (v, _) -> Some v | _ -> None )
 
-let save_value t value =
-  let loc = t.evaluated_loc in
-  { t with evaluated_map = Evaluated_value_map.add loc value t.evaluated_map; evaluated_loc = succ loc }
+let push_value t ~value =
+  t.evaluated_stack <- value :: t.evaluated_stack;
+  Option.iter
+    (fun expr ->
+      match expr with
+      | T.Cons (_, (T.Cons _ as rest)) -> t.rest_expression <- Some rest
+      | T.Cons (_, T.Empty_list)       -> t.rest_expression <- None
+      | _                              -> ())
+    t.rest_expression;
+  t
 
 (** [evaluated_values t] makes a list that contains value is same order as evaluated *)
-let evaluated_values t =
-  Evaluated_value_map.to_seq t.evaluated_map
-  |> List.of_seq
-  |> List.sort (fun (v1, _) (v2, _) -> Stdlib.compare v1 v2)
-  |> List.map snd
+let evaluated_values t = t.evaluated_stack |> List.rev
