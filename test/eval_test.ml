@@ -21,7 +21,7 @@ let tests =
         let actual = Eval.eval env T.True in
         Alcotest.(check @@ result data error_t) "true" actual (Ok T.True));
     Alcotest.test_case "should apply function" `Quick (fun () ->
-        let env = E.make [ ("+", T.Value (T.Primitive_fun P.Number_op.Export.plus)) ] in
+        let env = E.make [ ("+", T.B_value (T.Primitive_fun P.Number_op.Export.plus)) ] in
         let actual =
           Eval.eval env (T.Cons (T.Symbol "+", T.Cons (T.Number "3", T.Cons (T.Number "4", T.Empty_list))))
         in

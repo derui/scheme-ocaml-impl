@@ -3,7 +3,7 @@ open Type
 type t = {
   env : binding Environment.t;
   previous_continuation : t option;
-  context : Eval_context.t;
+  stack : Eval_stack.t;
 }
 
-let make ~context ~previous_continuation ~env = { env; previous_continuation; context }
+let make ~stack ~previous_continuation ~env = { env; previous_continuation; stack }

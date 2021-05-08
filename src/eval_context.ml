@@ -1,44 +1,65 @@
-(** This module provides a context for evaluation. *)
+(** Eval_environment have whole pointers and values, and function to evaluate between context and continuation. *)
 
 module T = Type
+module E = Eval_stack
 
-module Evaluated_value_map = Map.Make (struct
-  type t = int
-
-  let compare = Stdlib.compare
-end)
+type state =
+  | Finish_evaluation of T.data
+  | Start
+  | Continue
 
 type t = {
-  expression : T.data;
-  mutable rest_expression : T.data option;
-  mutable evaluated_stack : T.data list;
+  mutable continuation_pointer : Continuation.t;
+  mutable current_stack : Eval_stack.t;
+  mutable current_env : T.binding Environment.t;
+  mutable next_proc : state;
 }
 
-let make expr =
-  assert (T.is_proper_list expr);
-  let rest_expression = match expr with T.Cons _ -> Some expr | _ -> None in
-  { expression = expr; rest_expression; evaluated_stack = [] }
+let next t = match t.next_proc with Finish_evaluation v -> `Finished v | _ -> `Continue
 
-let clone t =
+let make ~env expr =
+  let stack = E.make ~kind:In_expression expr in
+  let continuation = Continuation.make ~stack ~previous_continuation:None ~env in
   {
-    expression = t.expression;
-    rest_expression = t.rest_expression;
-    evaluated_stack = List.map (fun v -> v) t.evaluated_stack;
+    continuation_pointer = continuation;
+    current_stack = E.make ~kind:In_expression expr;
+    next_proc = Start;
+    current_env = env;
   }
 
-let current t =
-  match t.rest_expression with None -> None | Some expr -> ( match expr with T.Cons (v, _) -> Some v | _ -> None )
+let push_expr_continuation t expr =
+  let new_stack = E.make ~kind:In_expression expr in
+  let new_env = Environment.make ~parent_env:t.current_env [] in
+  let new_cont =
+    Continuation.make ~previous_continuation:(Some t.continuation_pointer) ~env:t.current_env
+      ~stack:(E.clone t.current_stack)
+  in
+  t.continuation_pointer <- new_cont;
+  t.current_stack <- new_stack;
+  t.current_env <- new_env
 
-let push_value t ~value =
-  t.evaluated_stack <- value :: t.evaluated_stack;
-  Option.iter
-    (fun expr ->
-      match expr with
-      | T.Cons (_, (T.Cons _ as rest)) -> t.rest_expression <- Some rest
-      | T.Cons (_, T.Empty_list)       -> t.rest_expression <- None
-      | _                              -> ())
-    t.rest_expression;
+let push_closure_continuation t env body =
+  let new_stack = E.make ~kind:In_closure body in
+  let new_cont =
+    Continuation.make ~previous_continuation:(Some t.continuation_pointer) ~env:t.current_env
+      ~stack:(E.clone t.current_stack)
+  in
+  t.continuation_pointer <- new_cont;
+  t.current_stack <- new_stack;
+  t.current_env <- env
+
+let pop_continuation t =
+  let value = E.evaluated_values t.current_stack in
+  let old_stack = t.current_stack |> E.clone |> E.push_value ~value in
+  let old_env = t.current_env in
+  let old_cont = t.continuation_pointer.previous_continuation in
+  let () =
+    match old_cont with
+    | None      -> t.next_proc <- Finish_evaluation value
+    | Some cont ->
+        t.continuation_pointer <- cont;
+        t.current_stack <- old_stack;
+        t.current_env <- old_env;
+        t.next_proc <- Continue
+  in
   t
-
-(** [evaluated_values t] makes a list that contains value is same order as evaluated *)
-let evaluated_values t = t.evaluated_stack |> List.rev

@@ -17,20 +17,23 @@ type data =
     }
   | Primitive_fun of primitive_fun
   | Syntax        of special_form
+  | Macro         of macro_fun
 
 and scheme_fun = data -> data evaluation_result
 (** A type of function in scheme. All scheme's functions has this type. *)
 
 and special_form = env -> scheme_fun
 
+and macro_fun = data -> data evaluation_result
+
 and primitive_fun = Argument_formal.t * scheme_fun
 
 and env = binding Environment.t
 
 and binding =
-  | Value        of data
-  | Special_form of special_form
-  | Macro        of special_form
+  | B_value        of data
+  | B_special_form of special_form
+  | B_macro        of macro_fun
 
 and scheme_error =
   | Error_obj    of {

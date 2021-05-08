@@ -13,6 +13,7 @@ let rec to_string = function
   | Primitive_fun _     -> "<#proc ...>"
   | Closure _           -> "<#closure ...>"
   | Syntax _            -> "<#syntax ...>"
+  | Macro _             -> "<#macro ...>"
   | Scheme_string chars -> chars |> List.map D.Scheme_char.to_string |> String.concat ""
 
 and cons_to_string accum = function

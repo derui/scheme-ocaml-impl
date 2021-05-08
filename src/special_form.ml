@@ -8,14 +8,14 @@ let eval_define env v =
     match v with T.Cons (Symbol sym, Cons (v, Empty_list)) -> Ok (sym, v) | _ -> T.raise_syntax_error "Invalid syntax"
   in
   let* value = Eval.eval env v in
-  E.set env ~key:sym ~v:(T.Value value);
+  E.set env ~key:sym ~v:(T.B_value value);
   Result.ok value
 
 let eval_if env = function
   | T.Cons (cond, Cons (when_true, Cons (when_false, Empty_list))) -> (
       let open Lib.Result.Let_syntax in
       let* cond = Eval.eval env cond in
-      match cond with T.False -> Eval.eval env when_false | _ -> Eval.eval env when_true )
+      match cond with T.False -> Eval.eval env when_false | _ -> Eval.eval env when_true)
   | _ as v -> T.raise_error ~irritants:[ v ] (Printf.sprintf "Invalid syntax %s\n" @@ Printer.print v)
 
 let eval_set_force env v =
@@ -24,7 +24,7 @@ let eval_set_force env v =
     match v with T.Cons (Symbol sym, Cons (v, Empty_list)) -> Ok (sym, v) | _ -> T.raise_syntax_error "Invalid syntax"
   in
   let* value = Eval.eval env v in
-  match E.replace env ~key:sym ~v:(T.Value value) with
+  match E.replace env ~key:sym ~v:(T.B_value value) with
   | None    -> T.raise_error ~irritants:[ v ] (Printf.sprintf "%s is not defined" sym)
   | Some () -> Result.ok value
 
@@ -80,7 +80,7 @@ let eval_quasiquote env v =
                 Ok (T.Cons (accum, v))
           in
           eval_quasiquote' Empty_list v
-      | _      -> Ok v )
+      | _      -> Ok v)
   | _                      -> T.raise_error @@ Printf.sprintf "Invalid syntax: quasiquote: %s" @@ Printer.print v
 
 let eval_unquote env v =
@@ -103,7 +103,7 @@ let eval_quote _ v =
             | _              -> Primitive_op.List_op.reverse accum >>| fun accum -> T.Cons (accum, v)
           in
           eval_quote' Empty_list v
-      | _      -> Ok v )
+      | _      -> Ok v)
   | _                      -> T.raise_error @@ Printf.sprintf "Invalid syntax: quote: %s" @@ Printer.print v
 
 module Export = struct

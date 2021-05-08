@@ -9,9 +9,9 @@ let eval_symbol env sym =
   | None   -> T.raise_error @@ Printf.sprintf "%s is not bound" sym
   | Some v -> (
       match v with
-      | T.Value v           -> Ok v
-      | T.Special_form form -> Ok (T.Syntax form)
-      | T.Macro macro       -> Ok (T.Syntax macro) )
+      | T.B_value v           -> Ok v
+      | T.B_special_form form -> Ok (T.Syntax form)
+      | T.B_macro macro       -> Ok (T.Macro macro))
 
 let eval_primitive _ v = Ok v
 
@@ -36,7 +36,7 @@ and eval_list env v =
   match v with
   | T.Cons (Symbol sym, arg) -> (
       let* v = eval_symbol env sym in
-      match v with T.Syntax f -> f env arg | _ -> eval_combo env v arg )
+      match v with T.Syntax f -> f env arg | _ -> eval_combo env v arg)
   | T.Cons (car, cdr)        ->
       let* car = eval env car in
       let* arg = eval_list env cdr in
@@ -72,19 +72,19 @@ and eval_apply closure data =
     match formal with
     | D.Argument_formal.Fixed symbols ->
         let* arguments = argument_to_list [] data in
-        List.map2 (fun sym v -> (sym, T.Value v)) symbols arguments |> Result.ok
-    | Any sym                         -> Ok [ (sym, T.Value (Internal_lib.list_to_scheme_list arguments)) ]
+        List.map2 (fun sym v -> (sym, T.B_value v)) symbols arguments |> Result.ok
+    | Any sym                         -> Ok [ (sym, T.B_value (Internal_lib.list_to_scheme_list arguments)) ]
     | Fixed_and_any (symbols, sym)    ->
         let* arguments = argument_to_list [] data >>= fun v -> Ok (Array.of_list v) in
         let symbol_len = List.length symbols in
         let rest_length = max 0 (Array.length arguments - symbol_len) in
 
         let arguments_for_fixed = Array.sub arguments 0 symbol_len |> Array.to_list in
-        let bindings = List.map2 (fun sym v -> (sym, T.Value v)) symbols arguments_for_fixed
+        let bindings = List.map2 (fun sym v -> (sym, T.B_value v)) symbols arguments_for_fixed
         and rest_binding =
           Array.sub arguments symbol_len rest_length |> Array.to_list |> Internal_lib.list_to_scheme_list
         in
-        (sym, T.Value rest_binding) :: bindings |> Result.ok
+        (sym, T.B_value rest_binding) :: bindings |> Result.ok
   in
 
   match closure with
