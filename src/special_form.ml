@@ -8,7 +8,7 @@ let eval_define env v =
     match v with T.Cons (Symbol sym, Cons (v, Empty_list)) -> Ok (sym, v) | _ -> T.raise_syntax_error "Invalid syntax"
   in
   let* value = Eval.eval env v in
-  E.set env ~key:sym ~v:(T.B_value value);
+  E.set env ~key:sym ~v:value;
   Result.ok value
 
 let eval_if env = function
@@ -24,7 +24,7 @@ let eval_set_force env v =
     match v with T.Cons (Symbol sym, Cons (v, Empty_list)) -> Ok (sym, v) | _ -> T.raise_syntax_error "Invalid syntax"
   in
   let* value = Eval.eval env v in
-  match E.replace env ~key:sym ~v:(T.B_value value) with
+  match E.replace env ~key:sym ~v:value with
   | None    -> T.raise_error ~irritants:[ v ] (Printf.sprintf "%s is not defined" sym)
   | Some () -> Result.ok value
 

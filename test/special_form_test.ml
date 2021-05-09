@@ -6,8 +6,7 @@ module F = Ocaml_scheme.Special_form
 
 let data = Alcotest.testable Pr.pp ( = )
 
-let env =
-  Ocaml_scheme.Environment.make [ ("+", T.B_value (T.Primitive_fun Ocaml_scheme.Primitive_op.Number_op.Export.plus)) ]
+let env = Ocaml_scheme.Environment.make [ ("+", T.Primitive_fun Ocaml_scheme.Primitive_op.Number_op.Export.plus) ]
 
 let parse_exp v = Lexing.from_string v |> P.program L.token |> List.hd
 

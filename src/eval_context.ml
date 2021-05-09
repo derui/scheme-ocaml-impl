@@ -3,63 +3,58 @@
 module T = Type
 module E = Eval_stack
 
-type state =
-  | Finish_evaluation of T.data
+type 'a state =
+  | Finish_evaluation of 'a
   | Start
   | Continue
 
-type t = {
-  mutable continuation_pointer : Continuation.t;
-  mutable current_stack : Eval_stack.t;
-  mutable current_env : T.binding Environment.t;
-  mutable next_proc : state;
+type 'a t = {
+  mutable continuation_pointer : 'a Continuation.t;
+  mutable current_status : 'a;
+  mutable next_proc : 'a state;
 }
 
-let next t = match t.next_proc with Finish_evaluation v -> `Finished v | _ -> `Continue
+include Eval_context_intf
 
-let make ~env expr =
-  let stack = E.make ~kind:In_expression expr in
-  let continuation = Continuation.make ~stack ~previous_continuation:None ~env in
-  {
-    continuation_pointer = continuation;
-    current_stack = E.make ~kind:In_expression expr;
-    next_proc = Start;
-    current_env = env;
-  }
+let make (type s) (module S : Status with type t = s) (status : s) =
+  (module struct
+    type status = S.t
 
-let push_expr_continuation t expr =
-  let new_stack = E.make ~kind:In_expression expr in
-  let new_env = Environment.make ~parent_env:t.current_env [] in
-  let new_cont =
-    Continuation.make ~previous_continuation:(Some t.continuation_pointer) ~env:t.current_env
-      ~stack:(E.clone t.current_stack)
-  in
-  t.continuation_pointer <- new_cont;
-  t.current_stack <- new_stack;
-  t.current_env <- new_env
+    type context = {
+      mutable continuation_pointer : status Continuation.t;
+      mutable current_status : status;
+      mutable next_proc : status state;
+    }
 
-let push_closure_continuation t env body =
-  let new_stack = E.make ~kind:In_closure body in
-  let new_cont =
-    Continuation.make ~previous_continuation:(Some t.continuation_pointer) ~env:t.current_env
-      ~stack:(E.clone t.current_stack)
-  in
-  t.continuation_pointer <- new_cont;
-  t.current_stack <- new_stack;
-  t.current_env <- env
+    let instance =
+      {
+        continuation_pointer = Continuation.make ~status ~previous_continuation:None;
+        current_status = S.clone status;
+        next_proc = Start;
+      }
 
-let pop_continuation t =
-  let value = E.evaluated_values t.current_stack in
-  let old_stack = t.current_stack |> E.clone |> E.push_value ~value in
-  let old_env = t.current_env in
-  let old_cont = t.continuation_pointer.previous_continuation in
-  let () =
-    match old_cont with
-    | None      -> t.next_proc <- Finish_evaluation value
-    | Some cont ->
-        t.continuation_pointer <- cont;
-        t.current_stack <- old_stack;
-        t.current_env <- old_env;
-        t.next_proc <- Continue
-  in
-  t
+    let next t = match t.next_proc with Finish_evaluation v -> `Finished v | _ -> `Continue
+
+    let status { current_status; _ } = current_status
+
+    let update_status t ~f = t.current_status <- f t.current_status
+
+    let push_continuation t status =
+      let current_status = S.clone t.current_status in
+      let new_cont = Continuation.make ~previous_continuation:(Some t.continuation_pointer) ~status:current_status in
+      t.continuation_pointer <- new_cont;
+      t.current_status <- status
+
+    let pop_continuation t =
+      let old_status = t.continuation_pointer.current_status |> S.clone in
+      let old_cont = t.continuation_pointer.previous_continuation in
+      match old_cont with
+      | None      ->
+          t.next_proc <- Finish_evaluation old_status;
+          t.current_status <- old_status
+      | Some cont ->
+          t.continuation_pointer <- cont;
+          t.current_status <- old_status;
+          t.next_proc <- Continue
+  end : Instance
+    with type status = S.t)

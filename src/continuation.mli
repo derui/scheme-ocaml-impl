@@ -1,11 +1,10 @@
 (** This module provides type and functions of continuation *)
 
-type t = {
-  env : Type.binding Environment.t;
-  previous_continuation : t option;
-  stack : Eval_stack.t;
+type 'a t = {
+  previous_continuation : 'a t option;
+  current_status : 'a;
 }
 (** The type of continuation. *)
 
-val make : stack:Eval_stack.t -> previous_continuation:t option -> env:Type.binding Environment.t -> t
-(** [make ~stack ~previous_continuation ~env] make new continuation from values. *)
+val make : status:'a -> previous_continuation:'a t option -> 'a t
+(** [make ~previous_continuation ~status] make new continuation from values. *)

@@ -1,9 +1,6 @@
-open Type
-
-type t = {
-  env : binding Environment.t;
-  previous_continuation : t option;
-  stack : Eval_stack.t;
+type 'a t = {
+  previous_continuation : 'a t option;
+  current_status : 'a;
 }
 
-let make ~stack ~previous_continuation ~env = { env; previous_continuation; stack }
+let make ~status ~previous_continuation = { current_status = status; previous_continuation }
