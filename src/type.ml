@@ -22,8 +22,11 @@ type data =
 and scheme_fun = data -> data evaluation_result
 (** A type of function in scheme. All scheme's functions has this type. *)
 
-and special_form = env -> data -> [ `Macro of data | `Value of data ] evaluation_result
-(** Special form should return a value or macro to replace syntax *)
+(** Special form has specialized evaluator, so type has only kind of special form. *)
+and special_form =
+  | S_define
+  | S_set_force
+  | S_if
 
 and macro_fun = scheme_fun
 
