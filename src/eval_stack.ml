@@ -1,4 +1,4 @@
-(** This module provides a context for evaluation. *)
+(** This module provides a evaluation stack to hold intermediate values for procedure. *)
 
 module T = Type
 
@@ -8,88 +8,15 @@ module Evaluated_value_map = Map.Make (struct
   let compare = Stdlib.compare
 end)
 
-type kind =
-  | In_closure
-  | In_expression
+type t = { mutable evaluated_values : T.data }
 
-type common = {
-  expression : T.data;
-  rest_expression : T.data option;
-}
+let make ?(evaluated_values = T.Empty_list) () = { evaluated_values }
 
-type t =
-  | Expression of {
-      mutable common : common;
-      mutable evaluated_stack : T.data;
-    }
-  | Closure    of {
-      mutable common : common;
-      mutable evaluated_value : T.data;
-    }
-
-let make ~kind expr =
-  let rest_expression = Some expr in
-  match kind with
-  | In_closure    -> Closure { common = { expression = expr; rest_expression }; evaluated_value = T.Empty_list }
-  | In_expression -> Expression { common = { expression = expr; rest_expression }; evaluated_stack = T.Empty_list }
-
-let kind = function Closure _ -> In_closure | Expression _ -> In_expression
-
-let expression = function
-  | Closure { common = { expression; _ }; _ } -> expression
-  | Expression { common = { expression; _ }; _ } -> expression
-
-let clone = function
-  | Closure { common; evaluated_value }    -> Closure { common; evaluated_value }
-  | Expression { common; evaluated_stack } -> Expression { common; evaluated_stack }
-
-let current t =
-  match t with
-  | Closure { common; _ } | Expression { common; _ } -> (
-      match common.rest_expression with
-      | None      -> None
-      | Some expr -> ( match expr with T.Cons (v, _) -> Some v | v -> Some v))
-
-let replace_current t expr =
-  let () =
-    match t with
-    | Closure { common; _ } | Expression { common; _ } -> (
-        let rest_expression =
-          match common.rest_expression with
-          | None   -> None
-          | Some e -> ( match e with T.Cons (_, rest) -> Some (T.Cons (expr, rest)) | _ -> None)
-        in
-        match t with
-        | Closure t    -> t.common <- { common with rest_expression }
-        | Expression t -> t.common <- { common with rest_expression })
-  in
-  t
+let clone t = { evaluated_values = t.evaluated_values }
 
 let push_value t ~value =
-  let () =
-    match t with
-    | Expression t ->
-        t.evaluated_stack <- T.Cons (value, t.evaluated_stack);
-        Option.iter
-          (fun expr ->
-            match expr with
-            | T.Cons (_, (T.Cons _ as rest)) -> t.common <- { t.common with rest_expression = Some rest }
-            | T.Cons (_, T.Empty_list)       -> t.common <- { t.common with rest_expression = None }
-            | _                              -> t.common <- { t.common with rest_expression = None })
-          t.common.rest_expression
-    | Closure t    ->
-        t.evaluated_value <- value;
-        Option.iter
-          (fun expr ->
-            match expr with
-            | T.Cons (_, (T.Cons _ as rest)) -> t.common <- { t.common with rest_expression = Some rest }
-            | T.Cons (_, T.Empty_list)       -> t.common <- { t.common with rest_expression = None }
-            | _                              -> t.common <- { t.common with rest_expression = None })
-          t.common.rest_expression
-  in
+  let () = t.evaluated_values <- T.Cons (value, t.evaluated_values) in
   t
 
 (** [evaluated_values t] makes a list that contains value is same order as evaluated *)
-let evaluated_values = function
-  | Expression { evaluated_stack; _ } -> evaluated_stack
-  | Closure { evaluated_value; _ }    -> evaluated_value
+let evaluated_values { evaluated_values } = evaluated_values

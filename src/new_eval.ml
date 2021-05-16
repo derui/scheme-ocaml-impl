@@ -3,15 +3,33 @@ module D = Data_type
 module E = Environment
 module C = Eval_context
 module S = Eval_stack
+module EP = Execution_pointer
 
 module Evaluation_status = struct
+  type evaluating_for =
+    | For_syntax      of T.special_form
+    | For_closure
+    | For_application
+    | For_expression
+
   type t = {
     stack : Eval_stack.t;
     env : T.env;
-    in_syntax : T.special_form option;
+    mutable execution_pointer : Execution_pointer.t;
+    evaluating_for : evaluating_for;
   }
 
-  let clone t = { stack = Eval_stack.clone t.stack; env = t.env; in_syntax = t.in_syntax }
+  let clone t =
+    {
+      stack = Eval_stack.clone t.stack;
+      env = t.env;
+      execution_pointer = Execution_pointer.clone t.execution_pointer;
+      evaluating_for = t.evaluating_for;
+    }
+
+  let execution_pointer t = t.execution_pointer
+
+  let set_execution_pointer ep t = t.execution_pointer <- ep
 end
 
 let is_application = function T.Cons _ -> true | _ -> false
@@ -53,7 +71,8 @@ let eval_apply stack =
   match operator with
   | T.Primitive_fun (formal, f)            ->
       let* validated_args = Internal_lib.validate_arguments formal args in
-      Ok (`Value (f validated_args))
+      let* value = f validated_args in
+      Ok (`Value value)
   | Closure { env; argument_formal; body } ->
       let* data = Internal_lib.validate_arguments argument_formal args in
       let* arguments = argument_to_list [] data in
@@ -65,71 +84,81 @@ let eval_apply stack =
 
 let eval ~env expr =
   let open Lib.Result.Let_syntax in
-  if not @@ is_application expr then
-    let* ret = Evaluator.Step_evaluator.eval env expr in
-    match ret with `Value v -> Ok v | _ -> T.raise_error "Invalid evaluation path"
-  else
-    let stack = S.make ~kind:In_expression expr in
-    let context = C.make (module Evaluation_status) { Evaluation_status.stack; env; in_syntax = None } in
-    let module I = (val context : C.Instance with type status = Evaluation_status.t) in
-    let push_or_pop () =
-      let status = I.(status instance) in
-      match S.kind status.stack with
-      | S.In_closure    ->
-          let value = S.evaluated_values status.stack in
-          I.(pop_continuation instance);
-          I.(update_status instance) ~f:(fun status ->
-              { status with Evaluation_status.stack = S.push_value status.stack ~value })
-          |> Result.ok
-      | S.In_expression -> (
-          let* evaled = eval_apply status.stack in
-          match evaled with
-          | `Value value              ->
-              let* value = value in
-              I.(pop_continuation instance);
-              I.(update_status instance) ~f:(fun status ->
-                  { status with Evaluation_status.stack = S.push_value status.stack ~value })
-              |> Result.ok
-          | `Call_closure (env, body) ->
-              let new_stack = S.make ~kind:S.In_closure body in
-              let new_status = { Evaluation_status.stack = new_stack; env; in_syntax = None } in
-              I.(push_continuation instance new_status) |> Result.ok)
-    in
+  let open Lib.Result.Infix in
+  let execution_pointer = EP.make (T.Cons (expr, T.Empty_list)) in
+  let context =
+    C.make
+      (module Evaluation_status)
+      { Evaluation_status.stack = S.make (); env; evaluating_for = For_expression; execution_pointer }
+  in
+  let module I = (val context : C.Instance with type status = Evaluation_status.t) in
+  let push_or_pop () =
+    let status = I.(status instance) in
+    match status.evaluating_for with
+    (* if no stack and it is end of instruction, return value *)
+    | Evaluation_status.For_closure ->
+        let value = match status.stack |> S.evaluated_values with T.Cons (v, _) -> v | _ as v -> v in
+        I.(pop_continuation instance value) |> Result.ok
+    | Evaluation_status.For_application -> (
+        let* evaled = eval_apply status.stack in
+        print_endline "for application";
+        match evaled with
+        | `Value value              -> I.(pop_continuation instance value) |> Result.ok
+        | `Call_closure (env, body) ->
+            let new_stack = S.make () in
+            let execution_pointer = EP.make body in
+            let new_status =
+              { Evaluation_status.stack = new_stack; env; evaluating_for = For_closure; execution_pointer }
+            in
+            I.(push_continuation instance new_status) |> Result.ok)
+    | For_syntax _ -> failwith ""
+    | For_expression ->
+        let value = match status.stack |> S.evaluated_values with T.Cons (v, _) -> v | _ as v -> v in
+        Printf.printf "for expression %s\n" @@ Printer.print value;
+        I.(pop_continuation instance value) |> Result.ok
+  in
 
-    let apply_step env stack v =
-      match v with
-      | `Value value             ->
-          I.(update_status instance) ~f:(fun t -> { t with Evaluation_status.stack = S.push_value stack ~value })
-          |> Result.ok
-      | `Expand expr             ->
-          I.(update_status instance) ~f:(fun t -> { t with Evaluation_status.stack = S.replace_current stack expr })
-          |> Result.ok
-      | `Cont expr               ->
-          let new_stack = S.make ~kind:In_expression expr in
-          let new_env = Environment.make ~parent_env:env [] in
-          let status' = Evaluation_status.{ env = new_env; stack = new_stack; in_syntax = None } in
-          I.(push_continuation instance status') |> Result.ok
-      | `Call_syntax (form, arg) ->
-          let new_stack = S.make ~kind:In_expression expr in
-          let new_env = Environment.make ~parent_env:env [] in
-          let status' = Evaluation_status.{ env = new_env; stack = new_stack; in_syntax = Some form } in
-          I.(push_continuation instance status') |> Result.ok
-    in
+  let rec apply_step env stack v =
+    match v with
+    | `Value value             ->
+        I.(update_status instance) ~f:(fun t -> { t with Evaluation_status.stack = S.push_value stack ~value })
+        |> Result.ok
+    | `Expand expr             ->
+        let* v = Evaluator.Step_evaluator.eval env expr in
+        apply_step env stack v
+    | `Cont expr               ->
+        let new_stack = S.make () in
+        let new_env = Environment.make ~parent_env:env [] in
+        let execution_pointer = EP.make expr in
+        let status' =
+          { Evaluation_status.env = new_env; stack = new_stack; evaluating_for = For_application; execution_pointer }
+        in
+        I.(push_continuation instance status') |> Result.ok
+    | `Call_syntax (form, arg) ->
+        let new_stack = S.make () in
+        let new_env = Environment.make ~parent_env:env [] in
+        let execution_pointer = EP.make expr in
+        let status' =
+          { Evaluation_status.env = new_env; stack = new_stack; evaluating_for = For_syntax form; execution_pointer }
+        in
+        I.(push_continuation instance status') |> Result.ok
+  in
 
-    let rec eval_loop () =
-      let status = I.(status instance) in
-      let env = status.env and stack = status.stack in
-      match I.(next instance) with
-      | `Finished v -> ( match S.evaluated_values v.stack with T.Cons (v, _) -> Result.ok v | _ as v -> Result.ok v)
-      | `Continue   ->
-          let expr = S.current stack in
-          let* () =
-            match expr with
-            | None      -> push_or_pop ()
-            | Some expr ->
-                let* v = Evaluator.Step_evaluator.eval env expr in
-                apply_step env stack v
-          in
-          eval_loop ()
-    in
-    eval_loop ()
+  let rec eval_loop () =
+    let status = I.(status instance) in
+    let env = status.env and stack = status.stack in
+    match I.(next instance) with
+    | `Finished v      ->
+        let v' = match S.evaluated_values v.stack with T.Cons (v, _) -> v | _ as v -> v in
+        Printf.printf "finish %s\n" @@ Printer.print @@ S.evaluated_values v.stack;
+        Result.ok v'
+    | `Continue expr   ->
+        let* v = Evaluator.Step_evaluator.eval env expr in
+        apply_step env stack v >>= eval_loop
+    | `End_instruction -> push_or_pop () >>= eval_loop
+    | `Popped value    ->
+        Printf.printf "popped %s\n" @@ Printer.print value;
+        I.(update_status instance) ~f:(fun t -> { t with stack = S.push_value t.stack ~value })
+        |> Result.ok >>= eval_loop
+  in
+  eval_loop ()

@@ -9,7 +9,7 @@ module Pr = Ocaml_scheme.Printer
 let data = Alcotest.testable Pr.pp ( = )
 
 let tests =
-  let error_t = Alcotest.of_pp Fmt.nop in
+  let error_t = Alcotest.of_pp T.Scheme_error.pp in
   let parse s = Lexing.from_string s |> Ocaml_scheme.Parser.program Ocaml_scheme.Lexer.token |> List.hd in
 
   [
