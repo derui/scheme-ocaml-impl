@@ -3,6 +3,7 @@
 module T = Type
 module C = Continuation
 module E = Environment
+module ES = Eval_stack
 
 type result =
   [ `Value       of T.data
@@ -12,7 +13,9 @@ type result =
   ]
 
 module type S = sig
-  val eval : T.env -> T.data -> result T.evaluation_result
+  val eval : stack:T.data -> env:T.env -> expr:T.data -> result T.evaluation_result
+  (** [eval ~stack ~env ~expr] return a result of evaluation for expr. Evaluator can make decision with stack that is
+      evaluated value list before current evaluation. *)
 end
 
 module Step_evaluator : S = struct
@@ -24,7 +27,7 @@ module Step_evaluator : S = struct
   let eval_primitive v = Ok v
 
   (* evaluate a nested expression of expression *)
-  let eval env expr =
+  let eval ~stack:_ ~env ~expr =
     let open Lib.Result.Let_syntax in
     match expr with
     | T.Symbol sym ->
@@ -44,4 +47,28 @@ module Step_evaluator : S = struct
         | _             -> Ok (`Cont expr))
     | T.Cons _ -> Ok (`Cont expr)
     | _ as v -> T.raise_error (Printf.sprintf "Can not handle expression now... %s" @@ Printer.print v)
+end
+
+module Syntax_if_evaluator : S = struct
+  (* evaluate a if syntax *)
+  let eval ~stack ~env ~expr =
+    match stack with
+    | T.Empty_list                         -> Step_evaluator.eval ~stack ~env ~expr
+    | T.Cons (v, T.Empty_list)             -> if T.is_false v then Ok (`Value expr)
+                                              else Step_evaluator.eval ~stack ~env ~expr
+    | T.Cons (_, T.Cons (v, T.Empty_list)) ->
+        if T.is_true v then Ok (`Value expr) else Step_evaluator.eval ~stack ~env ~expr
+    | _                                    -> T.raise_syntax_error "Invalid syntax"
+end
+
+module Syntax_define_evaluator : S = struct
+  (* evaluate a if syntax *)
+  let eval ~stack ~env ~expr =
+    match stack with T.Empty_list -> Ok (`Value expr) | _ -> Step_evaluator.eval ~stack ~env ~expr
+end
+
+module Syntax_set_force_evaluator : S = struct
+  (* evaluate a if syntax *)
+  let eval ~stack ~env ~expr =
+    match stack with T.Empty_list -> Ok (`Value expr) | _ -> Step_evaluator.eval ~stack ~env ~expr
 end
