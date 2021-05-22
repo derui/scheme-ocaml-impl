@@ -1,5 +1,6 @@
 %{
     open Type
+    open Data_type
  %}
 
 %token <string> SYMBOL

@@ -8,6 +8,10 @@ let tests =
     ("Syntax rule library", Syntax_rule_lib_test.tests);
     ("Syntax rule pattern matcher", Syntax_rule_pattern_matcher_test.tests);
     ("Syntax rule template expansion", Syntax_rule_template_test.tests);
+    ("Unique symbol generator", Unique_symbol_generator_test.tests);
+    ("Evaluation stack", Eval_stack_test.tests);
+    ("Evaluation context", Eval_context_test.tests);
+    ("Execution pointer", Execution_pointer_test.tests);
   ]
 
 let () = Alcotest.run "OCaml scheme learning" tests

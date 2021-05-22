@@ -2,6 +2,7 @@ module P = Ocaml_scheme.Parser
 module Pr = Ocaml_scheme.Printer
 module L = Ocaml_scheme.Lexer
 module T = Ocaml_scheme.Type
+module D = Ocaml_scheme.Data_type
 
 let data = Alcotest.testable Pr.pp ( = )
 
@@ -85,13 +86,13 @@ let tests =
           [
             T.Scheme_string
               [
-                T.Scheme_char.Char "a";
-                T.Scheme_char.Char "b";
-                T.Scheme_char.Char "c";
-                T.Scheme_char.Char "d";
-                T.Scheme_char.Char "e";
-                T.Scheme_char.Char "f";
-                T.Scheme_char.alarm;
+                D.Scheme_char.Char "a";
+                D.Scheme_char.Char "b";
+                D.Scheme_char.Char "c";
+                D.Scheme_char.Char "d";
+                D.Scheme_char.Char "e";
+                D.Scheme_char.Char "f";
+                D.Scheme_char.alarm;
               ];
           ]
         in

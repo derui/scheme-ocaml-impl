@@ -1,4 +1,5 @@
 module T = Type
+module D = Data_type
 
 let length_of_list arg =
   let rec length' accum = function
@@ -10,7 +11,7 @@ let length_of_list arg =
 
 let validate_arguments formal data =
   match formal with
-  | T.Any _                 ->
+  | D.Argument_formal.Any _ ->
       if T.is_proper_list data then Ok data
       else T.raise_error @@ Printf.sprintf "%s is not proper list" @@ Printer.print data
   | Fixed args              ->
