@@ -114,11 +114,13 @@ let eval ~env expr =
         let* evaluated = status.stack |> S.evaluated_values |> Primitive_op.List_op.reverse in
         let* value =
           match form with
-          | T.S_if        -> Special_form.eval_if status.env evaluated
-          | T.S_define    -> Special_form.eval_define status.env evaluated
-          | T.S_set_force -> Special_form.eval_set_force status.env evaluated
-          | T.S_quote     -> Special_form.eval_quote status.env evaluated
-          | T.S_lambda    -> Special_form.eval_lambda status.env evaluated
+          | T.S_if         -> Special_form.eval_if status.env evaluated
+          | T.S_define     -> Special_form.eval_define status.env evaluated
+          | T.S_set_force  -> Special_form.eval_set_force status.env evaluated
+          | T.S_quote      -> Special_form.eval_quote status.env evaluated
+          | T.S_lambda     -> Special_form.eval_lambda status.env evaluated
+          | T.S_unquote    -> Special_form.eval_unquote status.env evaluated
+          | T.S_quasiquote -> Special_form.eval_quasiquote status.env evaluated
         in
         I.(pop_continuation instance value) |> Result.ok
     | For_expression ->
@@ -157,12 +159,14 @@ let eval ~env expr =
     let env = status.env and stack = status.stack in
     let module E =
     (val match status.Evaluation_status.evaluating_for with
-         | For_syntax T.S_if        -> (module Evaluator.Syntax_if_evaluator : Evaluator.S)
-         | For_syntax T.S_define    -> (module Evaluator.Syntax_define_evaluator : Evaluator.S)
-         | For_syntax T.S_set_force -> (module Evaluator.Syntax_set_force_evaluator : Evaluator.S)
-         | For_syntax T.S_quote     -> (module Evaluator.Syntax_quote_evaluator : Evaluator.S)
-         | For_syntax T.S_lambda    -> (module Evaluator.Syntax_quote_evaluator : Evaluator.S)
-         | _                        -> (module Evaluator.Step_evaluator : Evaluator.S))
+         | For_syntax T.S_if         -> (module Evaluator.Syntax_if_evaluator : Evaluator.S)
+         | For_syntax T.S_define     -> (module Evaluator.Syntax_define_evaluator : Evaluator.S)
+         | For_syntax T.S_set_force  -> (module Evaluator.Syntax_set_force_evaluator : Evaluator.S)
+         | For_syntax T.S_quote      -> (module Evaluator.Syntax_quote_evaluator : Evaluator.S)
+         | For_syntax T.S_lambda     -> (module Evaluator.Syntax_lambda_evaluator : Evaluator.S)
+         | For_syntax T.S_unquote    -> (module Evaluator.Syntax_unquote_evaluator : Evaluator.S)
+         | For_syntax T.S_quasiquote -> (module Evaluator.Syntax_quasiquote_evaluator : Evaluator.S)
+         | _                         -> (module Evaluator.Step_evaluator : Evaluator.S))
     in
     match I.(next instance) with
     | `Finished v      ->

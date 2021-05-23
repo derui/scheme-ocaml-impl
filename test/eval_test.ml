@@ -76,4 +76,10 @@ let tests =
         Alcotest.(check @@ result data error_t)
           "false" actual
           (Ok (T.Cons (T.Number "1", T.Cons (to_scheme_string "foo", T.Empty_list)))));
+    Alcotest.test_case "should be able to evaluate quasiquote-syntax" `Quick (fun () ->
+        let env = E.make [ ("quasiquote", T.Syntax T.S_quote) ] in
+        let actual = Eval.eval ~env @@ parse "`(1 \"foo\")" in
+        Alcotest.(check @@ result data error_t)
+          "false" actual
+          (Ok (T.Cons (T.Number "1", T.Cons (to_scheme_string "foo", T.Empty_list)))));
   ]

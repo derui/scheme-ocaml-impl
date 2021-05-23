@@ -18,6 +18,7 @@ type data =
   | Primitive_fun of primitive_fun
   | Syntax        of special_form
   | Macro         of macro_fun
+  | Undef
 
 and scheme_fun = data -> data evaluation_result
 (** A type of function in scheme. All scheme's functions has this type. *)
@@ -29,6 +30,8 @@ and special_form =
   | S_if
   | S_lambda
   | S_quote
+  | S_unquote
+  | S_quasiquote
 
 and macro_fun = scheme_fun
 

@@ -15,8 +15,9 @@ let parse_exp v = Lexing.from_string v |> P.program L.token |> List.hd
 
 let to_scheme_list list = List.rev list |> List.fold_left (fun accum v -> T.Cons (v, accum)) T.Empty_list
 
-let tests =
-  let error_t = Alcotest.of_pp T.scheme_error_pp in
+let error_t = Alcotest.of_pp T.scheme_error_pp
+
+let syntax_tests =
   [
     Alcotest.test_case "if: return second value if false" `Quick (fun () ->
         let env = env () in
@@ -26,6 +27,10 @@ let tests =
         let env = env () in
         let actual = parse_exp "(#t 1 2)" |> F.eval_if env in
         Alcotest.(check @@ result data error_t) "false" actual (Ok (T.Number "1")));
+    Alcotest.test_case "if: return undefined value if condition is false but expression not given" `Quick (fun () ->
+        let env = env () in
+        let actual = parse_exp "(#f 1)" |> F.eval_if env in
+        Alcotest.(check @@ result data error_t) "false" actual (Ok T.Undef));
     Alcotest.test_case "define: define value at symbol" `Quick (fun () ->
         let env = env () in
         let actual = parse_exp "(v 1)" |> F.eval_define env in
@@ -62,3 +67,19 @@ let tests =
           "value" actual
           (D.Argument_formal.Fixed [ "a" ], parse_exp "((+ a 2))"));
   ]
+
+let quasiquote_tests =
+  [
+    Alcotest.test_case "quasiquote: same quote on special form" `Quick (fun () ->
+        let env = env () in
+        let actual = parse_exp "(1)" |> F.eval_quasiquote env in
+        Alcotest.(check @@ result data error_t) "value" actual (Ok (T.Number "1")));
+    Alcotest.test_case "quasiquote: raise error if pass arguments that has number more than 2" `Quick (fun () ->
+        let env = env () in
+        let actual = parse_exp "(1 2)" |> F.eval_quasiquote env in
+        Alcotest.(check @@ result data error_t)
+          "value" actual
+          (T.raise_syntax_error "Invalid syntax: quasiquote: (1 2)"));
+  ]
+
+let tests = syntax_tests @ quasiquote_tests

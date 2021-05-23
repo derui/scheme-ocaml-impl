@@ -13,6 +13,7 @@ let eval_define env v =
 let eval_if _ = function
   | T.Cons (cond, Cons (when_true, Cons (when_false, Empty_list))) -> (
       match cond with T.False -> Ok when_false | _ -> Ok when_true)
+  | T.Cons (cond, Cons (when_true, Empty_list)) -> ( match cond with T.False -> Ok T.Undef | _ -> Ok when_true)
   | _ as v -> T.raise_error ~irritants:[ v ] (Printf.sprintf "Invalid syntax %s\n" @@ Printer.print v)
 
 let eval_set_force env v =
@@ -49,33 +50,15 @@ let eval_lambda env v =
                                  @@ Printf.sprintf "Syntax error: need argument list: %s"
                                  @@ Printer.print v
 
-(* let eval_quasiquote env v =
- *   let open Lib.Result.Let_syntax in
- *   (\* unwrap first *\)
- *   match v with
- *   | T.Cons (v, Empty_list) -> (
- *       match v with
- *       | Cons _ ->
- *           let rec eval_quasiquote' accum v =
- *             match v with
- *             | T.Empty_list -> Primitive_op.List_op.reverse accum
- *             | Cons ((Cons (Symbol "unquote", _) as body), rest) ->
- *                 let* body = Eval.eval env body in
- *                 eval_quasiquote' (T.Cons (body, accum)) rest
- *             | Cons (v, rest) -> eval_quasiquote' (T.Cons (v, accum)) rest
- *             | _ ->
- *                 let* accum = Primitive_op.List_op.reverse accum in
- *                 Ok (T.Cons (accum, v))
- *           in
- *           eval_quasiquote' Empty_list v
- *       | _      -> Ok v)
- *   | _                      -> T.raise_error @@ Printf.sprintf "Invalid syntax: quasiquote: %s" @@ Printer.print v
- *
- * let eval_unquote env v =
- *   (\* unwrap first *\)
- *   match v with
- *   | T.Cons (v, Empty_list) -> Eval.eval env v
- *   | _                      -> T.raise_error @@ Printf.sprintf "Invalid syntax: unquote: %s" @@ Printer.print v *)
+let eval_quasiquote _ v =
+  match v with
+  | T.Cons (v, Empty_list) -> Ok v
+  | _                      -> T.raise_syntax_error @@ Printf.sprintf "Invalid syntax: quasiquote: %s" @@ Printer.print v
+
+let eval_unquote _ v =
+  match v with
+  | T.Cons (v, Empty_list) -> Ok v
+  | _                      -> T.raise_syntax_error @@ Printf.sprintf "Invalid syntax: unquote: %s" @@ Printer.print v
 
 let eval_quote _ v =
   match v with
