@@ -115,8 +115,10 @@ let eval ~env expr =
         let* value =
           match form with
           | T.S_if        -> Special_form.eval_if status.env evaluated
-          | T.S_define    -> Special_form.eval_set_force status.env evaluated
-          | T.S_set_force -> Special_form.eval_define status.env evaluated
+          | T.S_define    -> Special_form.eval_define status.env evaluated
+          | T.S_set_force -> Special_form.eval_set_force status.env evaluated
+          | T.S_quote     -> Special_form.eval_quote status.env evaluated
+          | T.S_lambda    -> Special_form.eval_lambda status.env evaluated
         in
         I.(pop_continuation instance value) |> Result.ok
     | For_expression ->
@@ -143,10 +145,9 @@ let eval ~env expr =
         I.(push_continuation instance status') |> Result.ok
     | `Call_syntax (form, arg) ->
         let new_stack = S.make () in
-        let new_env = Environment.make ~parent_env:env [] in
         let execution_pointer = EP.make arg in
         let status' =
-          { Evaluation_status.env = new_env; stack = new_stack; evaluating_for = For_syntax form; execution_pointer }
+          { Evaluation_status.env; stack = new_stack; evaluating_for = For_syntax form; execution_pointer }
         in
         I.(push_continuation instance status') |> Result.ok
   in
@@ -159,6 +160,8 @@ let eval ~env expr =
          | For_syntax T.S_if        -> (module Evaluator.Syntax_if_evaluator : Evaluator.S)
          | For_syntax T.S_define    -> (module Evaluator.Syntax_define_evaluator : Evaluator.S)
          | For_syntax T.S_set_force -> (module Evaluator.Syntax_set_force_evaluator : Evaluator.S)
+         | For_syntax T.S_quote     -> (module Evaluator.Syntax_quote_evaluator : Evaluator.S)
+         | For_syntax T.S_lambda    -> (module Evaluator.Syntax_quote_evaluator : Evaluator.S)
          | _                        -> (module Evaluator.Step_evaluator : Evaluator.S))
     in
     match I.(next instance) with

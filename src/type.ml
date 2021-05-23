@@ -27,6 +27,8 @@ and special_form =
   | S_define
   | S_set_force
   | S_if
+  | S_lambda
+  | S_quote
 
 and macro_fun = scheme_fun
 
@@ -85,3 +87,7 @@ module Constructor = struct
 
   let number v = Number v
 end
+
+let scheme_error_show = function Error_obj v -> v.message | Syntax_error v -> v.message
+
+let scheme_error_pp fmt v = Format.fprintf fmt "%s" @@ scheme_error_show v
