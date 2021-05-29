@@ -50,10 +50,48 @@ let eval_lambda env v =
                                  @@ Printf.sprintf "Syntax error: need argument list: %s"
                                  @@ Printer.print v
 
-let eval_quasiquote _ v =
+let unquote_binded env = match E.get env ~key:"unquote" with None -> false | Some v -> v = T.Syntax T.S_unquote
+
+let eval_quasiquote env v =
+  let open Lib.Result.Let_syntax in
+  (* unwrap first *)
   match v with
-  | T.Cons (v, Empty_list) -> Ok v
-  | _                      -> T.raise_syntax_error @@ Printf.sprintf "Invalid syntax: quasiquote: %s" @@ Printer.print v
+  | T.Cons ((Cons _ as v), T.Empty_list) ->
+      let symbol_name = ref 0 in
+      let get_sym_name () =
+        incr symbol_name;
+        Printf.sprintf "%dquasiquote" !symbol_name
+      in
+      let rec eval_quasiquote' accum variables v =
+        match v with
+        | T.Empty_list ->
+            let* v = Primitive_op.List_op.reverse accum in
+            Ok (v, List.rev variables)
+        | Cons ((Cons (Symbol "quasiquote", _) as body), rest) -> eval_quasiquote' (T.Cons (body, accum)) variables rest
+        | Cons (Cons (Symbol "unquote", body), rest) when unquote_binded env ->
+            let sym_name = get_sym_name () in
+            let variables = (sym_name, body) :: variables in
+            eval_quasiquote' (T.Cons (T.Symbol sym_name, accum)) variables rest
+        | Cons ((Cons (Symbol "unquote", _) as body), rest) when not @@ unquote_binded env ->
+            eval_quasiquote' (T.Cons (T.Cons (T.Symbol "quote", body), accum)) variables rest
+        | Cons ((Cons _ as v), rest) ->
+            let* v, variables = eval_quasiquote' T.Empty_list variables v in
+            eval_quasiquote' (T.Cons (v, accum)) variables rest
+        | Cons (v, rest) -> eval_quasiquote' (T.Cons (v, accum)) variables rest
+        | _ ->
+            let* accum = Primitive_op.List_op.reverse accum in
+            Ok (T.Cons (accum, v), List.rev variables)
+      in
+      let* body, variables = eval_quasiquote' Empty_list [] v in
+      let argument_formal = D.Argument_formal.Fixed (List.map fst variables) in
+      let arguments = List.map snd variables |> Internal_lib.list_to_scheme_list in
+      Ok (T.Cons (T.Closure { env; argument_formal; body }, arguments))
+  | T.Cons (v, T.Empty_list)             ->
+      let argument_formal = D.Argument_formal.Fixed [] in
+      Ok (T.Cons (T.Closure { env; argument_formal; body = v }, T.Empty_list))
+  | _                                    -> T.raise_syntax_error
+                                            @@ Printf.sprintf "Invalid syntax: quasiquote: %s"
+                                            @@ Printer.print v
 
 let eval_unquote _ v =
   match v with

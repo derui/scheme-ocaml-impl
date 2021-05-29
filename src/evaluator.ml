@@ -85,11 +85,5 @@ end
 
 module Syntax_unquote_evaluator : S = struct
   (* evaluate a unquote syntax *)
-  let eval = Step_evaluator.eval
-end
-
-module Syntax_quasiquote_evaluator : S = struct
-  (* evaluate a unquote syntax *)
-  let eval ~stack:_ ~env:_ ~expr =
-    match expr with T.Cons (T.Symbol "unquote", arg) -> Ok (`Call_syntax (T.S_unquote, arg)) | _ -> Ok (`Value expr)
+  let eval ~stack:_ ~env:_ ~expr = Ok (`Value expr)
 end
