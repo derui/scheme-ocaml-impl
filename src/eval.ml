@@ -70,6 +70,7 @@ let eval_apply stack =
   in
   match operator with
   | T.Primitive_fun (formal, f)            ->
+      Printf.printf "call primitive\n";
       let* validated_args = Internal_lib.validate_arguments formal args in
       let* value = f validated_args in
       Ok (`Value value)
@@ -95,6 +96,7 @@ let eval ~env expr =
   let rec apply_step env stack v (module E : Evaluator.S) =
     match v with
     | `Value value             ->
+        Printf.printf "apply_step: %s\n" @@ Printer.print value;
         I.(update_status instance) ~f:(fun t -> { t with Evaluation_status.stack = S.push_value stack ~value })
         |> Result.ok
     | `Expand expr             ->
@@ -102,6 +104,7 @@ let eval ~env expr =
         let* v = E.eval ~stack:stack' ~env ~expr in
         apply_step env stack v (module E)
     | `Cont expr               ->
+        Printf.printf "cont: %s\n" @@ Printer.print expr;
         let new_stack = S.make () in
         let new_env = Environment.make ~parent_env:env [] in
         let execution_pointer = EP.make expr in
@@ -129,13 +132,16 @@ let eval ~env expr =
     match status.evaluating_for with
     (* if no stack and it is end of instruction, return value *)
     | Evaluation_status.For_closure ->
+        Printf.printf "total stack: %s\n" @@ Printer.print @@ (status.stack |> S.evaluated_values);
         let value = match status.stack |> S.evaluated_values with T.Cons (v, _) -> v | _ as v -> v in
+        Printf.printf "pop value: %s\n" @@ Printer.print value;
         I.(pop_continuation instance value) |> Result.ok
     | Evaluation_status.For_application -> (
         let* evaled = eval_apply status.stack in
         match evaled with
         | `Value value              -> I.(pop_continuation instance value) |> Result.ok
         | `Call_closure (env, body) ->
+            Printf.printf "push closure: %s\n" @@ Printer.print body;
             let new_stack = S.make () in
             let execution_pointer = EP.make body in
             let new_status =
@@ -164,14 +170,13 @@ let eval ~env expr =
     let env = status.env and stack = status.stack in
     let module E =
     (val match status.Evaluation_status.evaluating_for with
-         | For_syntax T.S_if         -> (module Evaluator.Syntax_if_evaluator : Evaluator.S)
-         | For_syntax T.S_define     -> (module Evaluator.Syntax_define_evaluator : Evaluator.S)
-         | For_syntax T.S_set_force  -> (module Evaluator.Syntax_set_force_evaluator : Evaluator.S)
-         | For_syntax T.S_quote      -> (module Evaluator.Syntax_quote_evaluator : Evaluator.S)
-         | For_syntax T.S_lambda     -> (module Evaluator.Syntax_quote_evaluator : Evaluator.S)
-         | For_syntax T.S_unquote    -> (module Evaluator.Syntax_quote_evaluator : Evaluator.S)
-         | For_syntax T.S_quasiquote -> (module Evaluator.Syntax_quote_evaluator : Evaluator.S)
-         | _                         -> (module Evaluator.Step_evaluator : Evaluator.S))
+         | For_syntax T.S_if        -> (module Evaluator.Syntax_if_evaluator : Evaluator.S)
+         | For_syntax T.S_define    -> (module Evaluator.Syntax_define_evaluator : Evaluator.S)
+         | For_syntax T.S_set_force -> (module Evaluator.Syntax_set_force_evaluator : Evaluator.S)
+         | For_syntax T.S_quote     -> (module Evaluator.Syntax_quote_evaluator : Evaluator.S)
+         | For_syntax T.S_lambda    -> (module Evaluator.Syntax_quote_evaluator : Evaluator.S)
+         | For_syntax T.S_unquote   -> (module Evaluator.Syntax_quote_evaluator : Evaluator.S)
+         | _                        -> (module Evaluator.Step_evaluator : Evaluator.S))
     in
     match I.(next instance) with
     | `Finished v      ->

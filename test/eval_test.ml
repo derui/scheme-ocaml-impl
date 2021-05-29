@@ -82,4 +82,30 @@ let tests =
         Alcotest.(check @@ result data error_t)
           "false" actual
           (Ok (T.Cons (T.Number "1", T.Cons (to_scheme_string "foo", T.Empty_list)))));
+    Alcotest.test_case "should be able to evaluate quasiquote-syntax with unquote" `Quick (fun () ->
+        let env =
+          E.make
+            [
+              ("quasiquote", T.Syntax T.S_quasiquote);
+              ("unquote", T.Syntax T.S_unquote);
+              ("quote", T.Syntax T.S_quote);
+              ("+", T.Primitive_fun P.Number_op.Export.plus);
+            ]
+        in
+        let actual = Eval.eval ~env @@ parse "`(1 ,(+ 1 3))" in
+        let expected = Ok (T.Cons (T.Number "1", T.Cons (T.Number "4", T.Empty_list))) in
+        Alcotest.(check @@ result data error_t) "false" expected actual);
+    Alcotest.test_case "should be able to evaluate nested quasiquote-syntax with unquote" `Quick (fun () ->
+        let env =
+          E.make
+            [
+              ("quasiquote", T.Syntax T.S_quasiquote);
+              ("unquote", T.Syntax T.S_unquote);
+              ("quote", T.Syntax T.S_quote);
+              ("+", T.Primitive_fun P.Number_op.Export.plus);
+            ]
+        in
+        let actual = Eval.eval ~env @@ parse "`(1 (+ ,(+ 3 5) 3) `,4)" in
+        let expected = Ok (parse "(1 (+ 8 3) (quasiquote (unquote 4)))") in
+        Alcotest.(check @@ result data error_t) "false" expected actual);
   ]

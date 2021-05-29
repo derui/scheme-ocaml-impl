@@ -8,6 +8,9 @@ module List_op = struct
 
   let cdr arg = match arg with T.Cons (Cons (_, v), _) -> Ok v | _ -> T.raise_error "pair requirement"
 
+  let cons arg =
+    match arg with T.Cons (v, T.Cons (v2, _)) -> Ok (T.Cons (v, v2)) | _ -> T.raise_error "two argument requirement"
+
   let length arg =
     let open Lib.Result.Let_syntax in
     let* arg = car arg in
@@ -30,6 +33,8 @@ module List_op = struct
     let cdr = (D.Argument_formal.Fixed [ "list" ], cdr)
 
     let reverse = (D.Argument_formal.Fixed [ "list" ], reverse)
+
+    let cons = (D.Argument_formal.Fixed [ "v1"; "v2" ], cons)
   end
 end
 

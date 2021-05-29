@@ -69,24 +69,17 @@ let syntax_tests =
   ]
 
 let quasiquote_tests =
-  let to_body = function T.Cons (T.Closure { body; _ }, _) -> body | _ -> Alcotest.fail "invalid" in
   [
     Alcotest.test_case "quasiquote: same quote on special form" `Quick (fun () ->
-        let env = env () in
-        let actual = parse_exp "(1)" |> F.eval_quasiquote env |> Result.map to_body in
-        Alcotest.(check @@ result data error_t) "value" (Ok (T.Number "1")) actual);
+        let env = env ~bindings:[ ("quote", T.Syntax T.S_quote) ] () in
+        let actual = parse_exp "(1)" |> F.eval_quasiquote env in
+        let expected = parse_exp "'1" |> Result.ok in
+        Alcotest.(check @@ result data error_t) "value" expected actual);
     Alcotest.test_case "quasiquote: raise error if pass arguments that has number more than 2" `Quick (fun () ->
         let env = env () in
         let actual = parse_exp "(1 2)" |> F.eval_quasiquote env in
-        Alcotest.(check @@ result data error_t)
-          "value" actual
-          (T.raise_syntax_error "Invalid syntax: quasiquote: (1 2)"));
-    Alcotest.test_case "quasiquote: replace evaluate result for unquote" `Quick (fun () ->
-        let env = env ~bindings:[ ("unquote", T.Syntax T.S_unquote) ] () in
-        let actual = parse_exp "((1 ,(+ 3 4)))" |> F.eval_quasiquote env |> Result.map to_body in
-        Alcotest.(check @@ result data error_t)
-          "value" actual
-          (Ok (T.Cons (T.Number "1", T.Cons (T.Symbol "1quasiquote", T.Empty_list)))));
+        let expected = T.raise_syntax_error "Invalid syntax: quasiquote: (1 2)" in
+        Alcotest.(check @@ result data error_t) "value" expected actual);
   ]
 
 let tests = syntax_tests @ quasiquote_tests

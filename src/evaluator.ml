@@ -46,6 +46,8 @@ module Step_evaluator : S = struct
             Ok (`Expand v)
         | _             -> Ok (`Cont expr))
     | T.Cons _ -> Ok (`Cont expr)
+    | T.Closure _ -> Ok (`Value expr)
+    | T.Primitive_fun _ -> Ok (`Value expr)
     | _ as v -> T.raise_error (Printf.sprintf "Can not handle expression now... %s" @@ Printer.print v)
 end
 
