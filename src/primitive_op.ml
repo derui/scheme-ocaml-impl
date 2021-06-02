@@ -11,11 +11,16 @@ module List_op = struct
   let cons arg =
     match arg with T.Cons (v, T.Cons (v2, _)) -> Ok (T.Cons (v, v2)) | _ -> T.raise_error "two argument requirement"
 
+  let is_pair arg = match arg with T.Cons _ | T.Empty_list -> Ok T.True | _ -> Ok T.False
+
   let length arg =
     let open Lib.Result.Let_syntax in
-    let* arg = car arg in
-    let len = Internal_lib.length_of_list arg in
-    T.Number (string_of_int len) |> Result.ok
+    match arg with
+    | T.Cons (T.Empty_list, T.Empty_list) -> T.Number "0" |> Result.ok
+    | _                                   ->
+        let* arg = car arg in
+        let len = Internal_lib.length_of_list arg in
+        T.Number (string_of_int len) |> Result.ok
 
   let reverse arg =
     let rec reverse' accum = function
@@ -24,6 +29,16 @@ module List_op = struct
       | _              -> T.raise_error @@ Printf.sprintf "%s is not proper list" @@ Printer.print arg
     in
     reverse' Empty_list arg
+
+  let append arg =
+    let list, _ = Internal_lib.scheme_list_to_list arg in
+    let list = list |> List.filter (function T.Empty_list -> false | _ -> true) in
+    match list with
+    | []    -> Ok T.Empty_list
+    | [ v ] -> Ok v
+    | _     ->
+        let rec append' accum = function [] -> reverse accum | v :: rest -> append' (T.Cons (v, accum)) rest in
+        append' T.Empty_list list
 
   module Export = struct
     let length = (D.Argument_formal.Fixed [ "list" ], length)

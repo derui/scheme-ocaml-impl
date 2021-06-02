@@ -12,6 +12,7 @@ let tests =
     ("Evaluation stack", Eval_stack_test.tests);
     ("Evaluation context", Eval_context_test.tests);
     ("Execution pointer", Execution_pointer_test.tests);
+    ("Primitive operations", Primitive_op_test.tests);
   ]
 
 let () = Alcotest.run "OCaml scheme learning" tests

@@ -28,6 +28,14 @@ let list_to_scheme_list list =
   let rec to_list' accum = function [] -> accum | v :: rest -> to_list' (T.Cons (v, accum)) rest in
   List.rev list |> to_list' T.Empty_list
 
+let scheme_list_to_list list =
+  let rec to_list' accum = function
+    | T.Empty_list     -> (List.rev accum, None)
+    | T.Cons (v, rest) -> to_list' (v :: accum) rest
+    | _ as v           -> (List.rev accum, Some v)
+  in
+  to_list' [] list
+
 let take_list arg n =
   let rec loop accum count v =
     if count = 0 then List.rev accum
