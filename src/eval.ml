@@ -70,6 +70,7 @@ let eval_apply stack =
   in
   match operator with
   | T.Primitive_fun (formal, f)            ->
+      Printf.printf "call primitive\n";
       let* validated_args = Internal_lib.validate_arguments formal args in
       let* value = f validated_args in
       Ok (`Value value)
@@ -92,41 +93,10 @@ let eval ~env expr =
       { Evaluation_status.stack = S.make (); env; evaluating_for = For_expression; execution_pointer }
   in
   let module I = (val context : C.Instance with type status = Evaluation_status.t) in
-  let push_or_pop () =
-    let status = I.(status instance) in
-    match status.evaluating_for with
-    (* if no stack and it is end of instruction, return value *)
-    | Evaluation_status.For_closure ->
-        let value = match status.stack |> S.evaluated_values with T.Cons (v, _) -> v | _ as v -> v in
-        I.(pop_continuation instance value) |> Result.ok
-    | Evaluation_status.For_application -> (
-        let* evaled = eval_apply status.stack in
-        match evaled with
-        | `Value value              -> I.(pop_continuation instance value) |> Result.ok
-        | `Call_closure (env, body) ->
-            let new_stack = S.make () in
-            let execution_pointer = EP.make body in
-            let new_status =
-              { Evaluation_status.stack = new_stack; env; evaluating_for = For_closure; execution_pointer }
-            in
-            I.(push_continuation instance new_status) |> Result.ok)
-    | For_syntax form ->
-        let* evaluated = status.stack |> S.evaluated_values |> Primitive_op.List_op.reverse in
-        let* value =
-          match form with
-          | T.S_if        -> Special_form.eval_if status.env evaluated
-          | T.S_define    -> Special_form.eval_set_force status.env evaluated
-          | T.S_set_force -> Special_form.eval_define status.env evaluated
-        in
-        I.(pop_continuation instance value) |> Result.ok
-    | For_expression ->
-        let value = match status.stack |> S.evaluated_values with T.Cons (v, _) -> v | _ as v -> v in
-        I.(pop_continuation instance value) |> Result.ok
-  in
-
   let rec apply_step env stack v (module E : Evaluator.S) =
     match v with
     | `Value value             ->
+        Printf.printf "apply_step: %s\n" @@ Printer.print value;
         I.(update_status instance) ~f:(fun t -> { t with Evaluation_status.stack = S.push_value stack ~value })
         |> Result.ok
     | `Expand expr             ->
@@ -134,6 +104,7 @@ let eval ~env expr =
         let* v = E.eval ~stack:stack' ~env ~expr in
         apply_step env stack v (module E)
     | `Cont expr               ->
+        Printf.printf "cont: %s\n" @@ Printer.print expr;
         let new_stack = S.make () in
         let new_env = Environment.make ~parent_env:env [] in
         let execution_pointer = EP.make expr in
@@ -141,14 +112,57 @@ let eval ~env expr =
           { Evaluation_status.env = new_env; stack = new_stack; evaluating_for = For_application; execution_pointer }
         in
         I.(push_continuation instance status') |> Result.ok
-    | `Call_syntax (form, arg) ->
-        let new_stack = S.make () in
-        let new_env = Environment.make ~parent_env:env [] in
-        let execution_pointer = EP.make arg in
-        let status' =
-          { Evaluation_status.env = new_env; stack = new_stack; evaluating_for = For_syntax form; execution_pointer }
-        in
-        I.(push_continuation instance status') |> Result.ok
+    | `Call_syntax (form, arg) -> (
+        match form with
+        | T.S_quasiquote ->
+            let* expr = Special_form.eval_quasiquote env arg in
+            let stack' = stack |> S.evaluated_values in
+            let* v = E.eval ~stack:stack' ~env ~expr in
+            apply_step env stack v (module E)
+        | _              ->
+            let new_stack = S.make () in
+            let execution_pointer = EP.make arg in
+            let status' =
+              { Evaluation_status.env; stack = new_stack; evaluating_for = For_syntax form; execution_pointer }
+            in
+            I.(push_continuation instance status') |> Result.ok)
+  in
+  let push_or_pop () =
+    let status = I.(status instance) in
+    match status.evaluating_for with
+    (* if no stack and it is end of instruction, return value *)
+    | Evaluation_status.For_closure ->
+        Printf.printf "total stack: %s\n" @@ Printer.print @@ (status.stack |> S.evaluated_values);
+        let value = match status.stack |> S.evaluated_values with T.Cons (v, _) -> v | _ as v -> v in
+        Printf.printf "pop value: %s\n" @@ Printer.print value;
+        I.(pop_continuation instance value) |> Result.ok
+    | Evaluation_status.For_application -> (
+        let* evaled = eval_apply status.stack in
+        match evaled with
+        | `Value value              -> I.(pop_continuation instance value) |> Result.ok
+        | `Call_closure (env, body) ->
+            Printf.printf "push closure: %s\n" @@ Printer.print body;
+            let new_stack = S.make () in
+            let execution_pointer = EP.make body in
+            let new_status =
+              { Evaluation_status.stack = new_stack; env; evaluating_for = For_closure; execution_pointer }
+            in
+            I.(push_continuation instance new_status) |> Result.ok)
+    | For_syntax form -> (
+        let open Lib.Result.Infix in
+        let* evaluated = status.stack |> S.evaluated_values |> Primitive_op.List_op.reverse in
+        let pop v = I.(pop_continuation instance v) |> Result.ok in
+        match form with
+        | T.S_if         -> Special_form.eval_if status.env evaluated >>= pop
+        | T.S_define     -> Special_form.eval_define status.env evaluated >>= pop
+        | T.S_set_force  -> Special_form.eval_set_force status.env evaluated >>= pop
+        | T.S_quote      -> Special_form.eval_quote status.env evaluated >>= pop
+        | T.S_lambda     -> Special_form.eval_lambda status.env evaluated >>= pop
+        | T.S_unquote    -> Special_form.eval_lambda status.env evaluated >>= pop
+        | T.S_quasiquote -> T.raise_syntax_error "Invalid evaluation process")
+    | For_expression ->
+        let value = match status.stack |> S.evaluated_values with T.Cons (v, _) -> v | _ as v -> v in
+        I.(pop_continuation instance value) |> Result.ok
   in
 
   let rec eval_loop () =
@@ -159,6 +173,9 @@ let eval ~env expr =
          | For_syntax T.S_if        -> (module Evaluator.Syntax_if_evaluator : Evaluator.S)
          | For_syntax T.S_define    -> (module Evaluator.Syntax_define_evaluator : Evaluator.S)
          | For_syntax T.S_set_force -> (module Evaluator.Syntax_set_force_evaluator : Evaluator.S)
+         | For_syntax T.S_quote     -> (module Evaluator.Syntax_quote_evaluator : Evaluator.S)
+         | For_syntax T.S_lambda    -> (module Evaluator.Syntax_quote_evaluator : Evaluator.S)
+         | For_syntax T.S_unquote   -> (module Evaluator.Syntax_quote_evaluator : Evaluator.S)
          | _                        -> (module Evaluator.Step_evaluator : Evaluator.S))
     in
     match I.(next instance) with

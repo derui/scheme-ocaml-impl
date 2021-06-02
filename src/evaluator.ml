@@ -46,6 +46,8 @@ module Step_evaluator : S = struct
             Ok (`Expand v)
         | _             -> Ok (`Cont expr))
     | T.Cons _ -> Ok (`Cont expr)
+    | T.Closure _ -> Ok (`Value expr)
+    | T.Primitive_fun _ -> Ok (`Value expr)
     | _ as v -> T.raise_error (Printf.sprintf "Can not handle expression now... %s" @@ Printer.print v)
 end
 
@@ -62,13 +64,28 @@ module Syntax_if_evaluator : S = struct
 end
 
 module Syntax_define_evaluator : S = struct
-  (* evaluate a if syntax *)
+  (* evaluate a define syntax *)
   let eval ~stack ~env ~expr =
     match stack with T.Empty_list -> Ok (`Value expr) | _ -> Step_evaluator.eval ~stack ~env ~expr
 end
 
 module Syntax_set_force_evaluator : S = struct
-  (* evaluate a if syntax *)
+  (* evaluate a set! syntax *)
   let eval ~stack ~env ~expr =
     match stack with T.Empty_list -> Ok (`Value expr) | _ -> Step_evaluator.eval ~stack ~env ~expr
+end
+
+module Syntax_quote_evaluator : S = struct
+  (* evaluate a quote syntax *)
+  let eval ~stack:_ ~env:_ ~expr = Ok (`Value expr)
+end
+
+module Syntax_lambda_evaluator : S = struct
+  (* evaluate a lambda syntax *)
+  let eval ~stack:_ ~env:_ ~expr = Ok (`Value expr)
+end
+
+module Syntax_unquote_evaluator : S = struct
+  (* evaluate a unquote syntax *)
+  let eval ~stack:_ ~env:_ ~expr = Ok (`Value expr)
 end
