@@ -18,14 +18,14 @@ let rec to_string = function
   | Scheme_string chars -> chars |> List.map D.Scheme_char.to_string |> String.concat ""
 
 and cons_to_string accum = function
-  | Cons (v, (Cons _ as rest)) -> cons_to_string (v :: accum) rest
-  | Cons (v, Empty_list)       -> List.map to_string (v :: accum)
-                                  |> List.rev |> String.concat " " |> Printf.sprintf "(%s)"
-  | Cons (v, rest)             ->
+  | Cons { car = v; cdr = Cons _ as rest } -> cons_to_string (v :: accum) rest
+  | Cons { car = v; cdr = Empty_list }     ->
+      List.map to_string (v :: accum) |> List.rev |> String.concat " " |> Printf.sprintf "(%s)"
+  | Cons { car = v; cdr = rest }           ->
       let accum = List.map to_string (v :: accum) |> List.rev |> String.concat " " in
       let rest = to_string rest in
       Printf.sprintf "(%s . %s)" accum rest
-  | _                          -> failwith "Invalid syntax"
+  | _                                      -> failwith "Invalid syntax"
 
 let print = to_string
 

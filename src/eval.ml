@@ -39,9 +39,9 @@ let eval_apply stack =
   let open Lib.Result.Let_syntax in
   let rec argument_to_list evaled arg =
     match arg with
-    | T.Empty_list    -> List.rev evaled |> Result.ok
-    | Cons (car, cdr) -> argument_to_list (car :: evaled) cdr
-    | _               -> T.raise_error "argument is not proper list"
+    | T.Empty_list      -> List.rev evaled |> Result.ok
+    | Cons { car; cdr } -> argument_to_list (car :: evaled) cdr
+    | _                 -> T.raise_error "argument is not proper list"
   in
   let to_binding_arguments formal arguments data =
     match formal with
@@ -65,8 +65,9 @@ let eval_apply stack =
   let* values = S.evaluated_values stack |> Primitive_op.List_op.reverse in
   let* operator, args =
     match values with
-    | T.Cons (operator, args) -> Ok (operator, args)
-    | _                       -> T.raise_error (Printf.sprintf "Invalid application: %s" @@ Printer.print values)
+    | T.Cons { car = operator; cdr = args } -> Ok (operator, args)
+    | _                                     -> T.raise_error
+                                                 (Printf.sprintf "Invalid application: %s" @@ Printer.print values)
   in
   match operator with
   | T.Primitive_fun (formal, f)            ->
@@ -86,7 +87,7 @@ let eval_apply stack =
 let eval ~env expr =
   let open Lib.Result.Let_syntax in
   let open Lib.Result.Infix in
-  let execution_pointer = EP.make (T.Cons (expr, T.Empty_list)) in
+  let execution_pointer = EP.make (T.cons expr T.Empty_list) in
   let context =
     C.make
       (module Evaluation_status)
@@ -133,7 +134,7 @@ let eval ~env expr =
     (* if no stack and it is end of instruction, return value *)
     | Evaluation_status.For_closure ->
         Printf.printf "total stack: %s\n" @@ Printer.print @@ (status.stack |> S.evaluated_values);
-        let value = match status.stack |> S.evaluated_values with T.Cons (v, _) -> v | _ as v -> v in
+        let value = match status.stack |> S.evaluated_values with T.Cons { car = v; _ } -> v | _ as v -> v in
         Printf.printf "pop value: %s\n" @@ Printer.print value;
         I.(pop_continuation instance value) |> Result.ok
     | Evaluation_status.For_application -> (
@@ -161,7 +162,7 @@ let eval ~env expr =
         | T.S_unquote    -> Special_form.eval_lambda status.env evaluated >>= pop
         | T.S_quasiquote -> T.raise_syntax_error "Invalid evaluation process")
     | For_expression ->
-        let value = match status.stack |> S.evaluated_values with T.Cons (v, _) -> v | _ as v -> v in
+        let value = match status.stack |> S.evaluated_values with T.Cons { car = v; _ } -> v | _ as v -> v in
         I.(pop_continuation instance value) |> Result.ok
   in
 
@@ -180,7 +181,7 @@ let eval ~env expr =
     in
     match I.(next instance) with
     | `Finished v      ->
-        let v' = match S.evaluated_values v.stack with T.Cons (v, _) -> v | _ as v -> v in
+        let v' = match S.evaluated_values v.stack with T.Cons { car = v; _ } -> v | _ as v -> v in
         Result.ok v'
     | `Continue expr   ->
         let stack' = stack |> S.evaluated_values in

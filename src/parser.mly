@@ -26,14 +26,14 @@ exp:
   | BOOL_TRUE { True }
   | scheme_list { $1 }
   | STRING { Scheme_string (List.map Scheme_char.of_string $1) }
-  | QUASIQUOTE exp { Cons (Symbol "quasiquote", Cons ($2, Empty_list)) }
-  | QUOTE exp { Cons (Symbol "quote",Cons ($2, Empty_list)) }
-  | UNQUOTE exp { Cons (Symbol "unquote", Cons ($2, Empty_list)) }
+  | QUASIQUOTE exp { Cons {car = Symbol "quasiquote"; cdr = Cons {car = $2; cdr = Empty_list}} }
+  | QUOTE exp { Cons {car = Symbol "quote"; cdr =Cons {car = $2; cdr = Empty_list}} }
+  | UNQUOTE exp { Cons {car = Symbol "unquote"; cdr = Cons {car = $2; cdr = Empty_list}} }
 
 scheme_list:
   | LEFT_PAREN scheme_list_body { $2 }
 
 scheme_list_body:
   | RIGHT_PAREN { Empty_list }
-  | exp scheme_list_body { Cons ($1, $2) }
-  | exp DOT exp RIGHT_PAREN { Cons ($1, $3) }
+  | exp scheme_list_body { Cons {car = $1; cdr = $2} }
+  | exp DOT exp RIGHT_PAREN { Cons {car = $1; cdr = $3} }
