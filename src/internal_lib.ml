@@ -3,9 +3,9 @@ module D = Data_type
 
 let length_of_list arg =
   let rec length' accum = function
-    | T.Empty_list   -> accum
-    | Cons (_, rest) -> length' (succ accum) rest
-    | _              -> failwith "defined for only proper list"
+    | T.Empty_list           -> accum
+    | Cons { cdr = rest; _ } -> length' (succ accum) rest
+    | _                      -> failwith "defined for only proper list"
   in
   length' 0 arg
 
@@ -25,14 +25,14 @@ let validate_arguments formal data =
       if len > arg_len then T.raise_error @@ Printf.sprintf "procedure requires at least %d arguments" len else Ok data
 
 let list_to_scheme_list list =
-  let rec to_list' accum = function [] -> accum | v :: rest -> to_list' (T.Cons (v, accum)) rest in
+  let rec to_list' accum = function [] -> accum | v :: rest -> to_list' (T.Cons { car = v; cdr = accum }) rest in
   List.rev list |> to_list' T.Empty_list
 
 let scheme_list_to_list list =
   let rec to_list' accum = function
-    | T.Empty_list     -> (List.rev accum, None)
-    | T.Cons (v, rest) -> to_list' (v :: accum) rest
-    | _ as v           -> (List.rev accum, Some v)
+    | T.Empty_list                   -> (List.rev accum, None)
+    | T.Cons { car = v; cdr = rest } -> to_list' (v :: accum) rest
+    | _ as v                         -> (List.rev accum, Some v)
   in
   to_list' [] list
 
@@ -41,10 +41,10 @@ let take_list arg n =
     if count = 0 then List.rev accum
     else
       match v with
-      | T.Cons (v, T.Empty_list)       -> List.rev (v :: accum)
-      | T.Cons (v, (T.Cons _ as rest)) -> loop (v :: accum) (pred count) rest
-      | T.Cons (v, _)                  -> List.rev (v :: accum)
-      | _                              -> []
+      | T.Cons { car = v; cdr = T.Empty_list } -> List.rev (v :: accum)
+      | T.Cons { car = v; cdr = T.Cons _ as rest } -> loop (v :: accum) (pred count) rest
+      | T.Cons { car = v; _ } -> List.rev (v :: accum)
+      | _ -> []
   in
   loop [] n arg |> list_to_scheme_list
 
@@ -53,8 +53,8 @@ let tail_list arg n =
     if count = 0 then v
     else
       match v with
-      | T.Cons (_, (T.Cons _ as rest)) -> loop (pred count) rest
-      | T.Cons (_, _)                  -> failwith "Length of list less than n"
-      | _                              -> failwith "Invalid argument"
+      | T.Cons { cdr = T.Cons _ as rest; _ } -> loop (pred count) rest
+      | T.Cons _                             -> failwith "Length of list less than n"
+      | _                                    -> failwith "Invalid argument"
   in
   loop n arg

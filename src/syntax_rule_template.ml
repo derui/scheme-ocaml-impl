@@ -5,48 +5,47 @@ module T = Type
 
 type expanded = T.data
 
-let cons car cdr = T.Cons (car, cdr)
-
 let reverse v = Primitive_op.List_op.reverse v |> Result.get_ok
 
-let apply_expanded accum expanded = List.fold_left (fun accum v -> cons v accum) accum expanded
+let apply_expanded accum expanded = List.fold_left (fun accum v -> T.cons v accum) accum expanded
 
 let expand matcher ellipsis template =
   let rec expand_list' matcher level accum template =
     match template with
     | T.Empty_list -> reverse accum
-    | T.Cons (v, T.Empty_list) ->
+    | T.Cons { car = v; cdr = T.Empty_list } ->
         let v = expand' matcher level v in
         apply_expanded accum v |> reverse
-    | T.Cons (T.Symbol e, T.Cons (v, T.Empty_list)) when e = ellipsis -> cons v accum |> reverse
-    | T.Cons ((T.Cons _ as v), rest) ->
+    | T.Cons { car = T.Symbol e; cdr = T.Cons { car = v; cdr = T.Empty_list } } when e = ellipsis ->
+        T.cons v accum |> reverse
+    | T.Cons { car = T.Cons _ as v; cdr = rest } ->
         let accum = expand' matcher level v |> apply_expanded accum in
         expand_list' matcher level accum rest
     (* ellipsis at the end of list *)
-    | T.Cons (v, T.Cons (T.Symbol e, (T.Cons _ as rest))) when e = ellipsis ->
+    | T.Cons { car = v; cdr = T.Cons { car = T.Symbol e; cdr = T.Cons _ as rest } } when e = ellipsis ->
         let accum = expand' matcher (succ level) v |> apply_expanded accum in
         expand_list' matcher level accum rest
     (* ellipsis at before dot *)
-    | T.Cons (v, T.Cons (T.Symbol e, Empty_list)) when e = ellipsis ->
+    | T.Cons { car = v; cdr = T.Cons { car = T.Symbol e; cdr = Empty_list } } when e = ellipsis ->
         let accum = expand' matcher (succ level) v |> apply_expanded accum |> reverse in
         accum
-    | T.Cons (v, T.Cons (T.Symbol e, rest)) when e = ellipsis ->
+    | T.Cons { car = v; cdr = T.Cons { car = T.Symbol e; cdr = rest } } when e = ellipsis ->
         let accum = expand' matcher (succ level) v |> apply_expanded accum |> reverse in
         let dot = expand' matcher level rest |> List.hd in
-        cons accum dot
-    | T.Cons (v, (T.Cons _ as rest)) ->
+        T.cons accum dot
+    | T.Cons { car = v; cdr = T.Cons _ as rest } ->
         let accum = expand' matcher level v |> apply_expanded accum in
         expand_list' matcher level accum rest
-    | T.Cons (v, rest) ->
+    | T.Cons { car = v; cdr = rest } ->
         let accum = expand' matcher level v |> apply_expanded accum |> reverse in
         let dot = expand' matcher level rest |> List.hd in
-        cons accum dot
+        T.cons accum dot
     | _ -> failwith ""
   and expand' matcher level template =
     match template with
     | T.Symbol v -> (
         let pv = M.Pattern_matcher.get_pattern_variable (v, level) matcher in
-        match pv with None -> [ template ] | Some v -> v )
+        match pv with None -> [ template ] | Some v -> v)
     | T.Cons _   -> [ expand_list' matcher level T.Empty_list template ]
     | _          -> [ template ]
   in

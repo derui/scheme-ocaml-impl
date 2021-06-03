@@ -4,7 +4,10 @@ open Data_type
 type data =
   | Symbol        of string
   | Number        of string
-  | Cons          of data * data
+  | Cons          of {
+      mutable car : data;
+      mutable cdr : data;
+    }
   | True
   | False
   | Scheme_string of Scheme_char.t list
@@ -77,19 +80,17 @@ let is_false = function False -> true | _ -> false
 
 let is_number = function Number _ -> true | _ -> false
 
-let rec is_proper_list v = match v with Empty_list -> true | Cons (_, cdr) -> is_proper_list cdr | _ -> false
+let rec is_proper_list v = match v with Empty_list -> true | Cons { cdr; _ } -> is_proper_list cdr | _ -> false
 
 module Access = struct
   let symbol_name = function Symbol sym -> Some sym | _ -> None
 end
 
-module Constructor = struct
-  let cons a b = Cons (a, b)
+let cons a b = Cons { car = a; cdr = b }
 
-  let symbol b = Symbol b
+let symbol b = Symbol b
 
-  let number v = Number v
-end
+let number v = Number v
 
 let scheme_error_show = function Error_obj v -> v.message | Syntax_error v -> v.message
 

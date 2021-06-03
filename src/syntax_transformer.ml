@@ -18,7 +18,7 @@ let eval_syntax_rules v =
 let eval_define_syntax env v =
   let open Lib.Result.Let_syntax in
   match v with
-  | T.Cons (T.Symbol sym, T.Cons (rest, T.Empty_list)) ->
+  | T.Cons { car = T.Symbol sym; cdr = T.Cons { car = rest; cdr = T.Empty_list } } ->
       let* v, _ = L.Rule_parser.syntax_rules rest in
       let v = T.Macro (define_macro v) in
       E.set env ~key:sym ~v;

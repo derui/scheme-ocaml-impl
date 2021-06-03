@@ -13,7 +13,7 @@ let env ?(bindings = []) () =
 
 let parse_exp v = Lexing.from_string v |> P.program L.token |> List.hd
 
-let to_scheme_list list = List.rev list |> List.fold_left (fun accum v -> T.Cons (v, accum)) T.Empty_list
+let to_scheme_list list = List.rev list |> List.fold_left (fun accum v -> T.cons v accum) T.Empty_list
 
 let error_t = Alcotest.of_pp T.scheme_error_pp
 

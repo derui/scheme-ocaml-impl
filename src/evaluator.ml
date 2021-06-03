@@ -37,7 +37,7 @@ module Step_evaluator : S = struct
         let* ret = eval_primitive v in
         Ok (`Value ret)
     (* special case for macro and syntax *)
-    | T.Cons (Symbol sym, arg) -> (
+    | T.Cons { car = Symbol sym; cdr = arg } -> (
         let* v = eval_symbol env sym in
         match v with
         | T.Syntax form -> Ok (`Call_syntax (form, arg))
@@ -55,12 +55,12 @@ module Syntax_if_evaluator : S = struct
   (* evaluate a if syntax *)
   let eval ~stack ~env ~expr =
     match stack with
-    | T.Empty_list                         -> Step_evaluator.eval ~stack ~env ~expr
-    | T.Cons (v, T.Empty_list)             -> if T.is_false v then Ok (`Value expr)
-                                              else Step_evaluator.eval ~stack ~env ~expr
-    | T.Cons (_, T.Cons (v, T.Empty_list)) ->
+    | T.Empty_list -> Step_evaluator.eval ~stack ~env ~expr
+    | T.Cons { car = v; cdr = T.Empty_list } ->
+        if T.is_false v then Ok (`Value expr) else Step_evaluator.eval ~stack ~env ~expr
+    | T.Cons { cdr = T.Cons { car = v; cdr = T.Empty_list }; _ } ->
         if T.is_true v then Ok (`Value expr) else Step_evaluator.eval ~stack ~env ~expr
-    | _                                    -> T.raise_syntax_error "Invalid syntax"
+    | _ -> T.raise_syntax_error "Invalid syntax"
 end
 
 module Syntax_define_evaluator : S = struct

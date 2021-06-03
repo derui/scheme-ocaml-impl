@@ -10,7 +10,9 @@ let error_t = Alcotest.testable T.Scheme_error.pp ( = )
 
 let parser_pp p = Alcotest.(result (pair p exp_pp) error_t)
 
-let list_to_scheme_list v = List.rev v |> List.fold_left (fun accum v -> T.Cons (v, accum)) T.Empty_list
+let parse v = Lexing.from_string v |> Ocaml_scheme.Parser.program Ocaml_scheme.Lexer.token |> List.hd
+
+let list_to_scheme_list v = List.rev v |> List.fold_left (fun accum v -> T.cons v accum) T.Empty_list
 
 let list_parser_tests =
   [
@@ -20,7 +22,7 @@ let list_parser_tests =
         let expected = Ok (T.Symbol "foo", T.Empty_list) in
         Alcotest.(check @@ parser_pp @@ element_p) "simple" expected actual);
     Alcotest.test_case "List Parser: parser a cdr of list" `Quick (fun () ->
-        let list = T.Constructor.(cons (symbol "a") (symbol "b")) in
+        let list = parse "(a . b)" in
         let actual = S.List_parser.element list in
         let expected = Ok (T.Symbol "a", T.Symbol "b") in
         Alcotest.(check @@ parser_pp element_p) "simple" expected actual);
@@ -29,7 +31,7 @@ let list_parser_tests =
           S.List_parser.Infix.(
             (function T.Symbol s -> String.uppercase_ascii s | _ -> "other") <$> S.List_parser.element)
         in
-        let list = [ T.Symbol "foo"; T.Symbol "bar" ] |> list_to_scheme_list in
+        let list = parse "(foo bar)" in
         let actual = S.List_parser.many p list in
         let expected = Ok ([ "FOO"; "BAR" ], T.Empty_list) in
         Alcotest.(check @@ parser_pp @@ list string) "simple" expected actual);
@@ -38,7 +40,7 @@ let list_parser_tests =
           S.List_parser.Infix.(
             (function T.Symbol s -> String.uppercase_ascii s | _ -> "other") <$> S.List_parser.element)
         in
-        let list = [ T.Symbol "foo"; T.Symbol "bar" ] |> list_to_scheme_list in
+        let list = parse "(foo bar)" in
         let actual = S.List_parser.many p list in
         let expected = Ok ([ "FOO"; "BAR" ], T.Empty_list) in
         Alcotest.(check @@ parser_pp @@ list string) "simple" expected actual);
@@ -54,7 +56,7 @@ let list_parser_tests =
         Alcotest.(check @@ parser_pp string) "simple" expected actual);
     Alcotest.test_case "List Parser: expression allow to parse dotted-list" `Quick (fun () ->
         let open S.List_parser.Let_syntax in
-        let list = T.Constructor.(cons (symbol "a") (symbol "b")) in
+        let list = parse "(a . b)" in
         let p =
           let* _ = S.List_parser.element in
           S.List_parser.cdr
@@ -85,19 +87,17 @@ let pattern_parser_test =
         let expected = Ok (P.Nest [ P.Symbol "b"; P.Symbol "c"; P.Constant (T.Number "10") ], T.Empty_list) in
         Alcotest.(check rule_pp) "simple" expected actual);
     Alcotest.test_case "Rule Parser: parse nested pattern" `Quick (fun () ->
-        let list =
-          T.Constructor.[ symbol "a"; [ symbol "a"; symbol "b" ] |> list_to_scheme_list ] |> list_to_scheme_list
-        in
+        let list = parse "(a (a b))" in
         let actual = S.Rule_parser.pattern_in_rule list in
         let expected = Ok (P.Nest [ P.Nest [ P.Symbol "a"; P.Symbol "b" ] ], T.Empty_list) in
         Alcotest.(check rule_pp) "simple" expected actual);
     Alcotest.test_case "Rule Parser: parse pattern contained ellipsis" `Quick (fun () ->
-        let list = T.Constructor.[ symbol "a"; symbol "a"; symbol "..." ] |> list_to_scheme_list in
+        let list = parse "(a a ...)" in
         let actual = S.Rule_parser.pattern_in_rule list in
         let expected = Ok (P.Nest [ P.Symbol "a"; P.Symbol "..." ], T.Empty_list) in
         Alcotest.(check rule_pp) "simple" expected actual);
     Alcotest.test_case "Rule Parser: parse pattern contained dot" `Quick (fun () ->
-        let list = T.Constructor.(cons (symbol "a") @@ cons (symbol "b") (symbol "c")) in
+        let list = parse "(a b . c)" in
         let actual = S.Rule_parser.pattern_in_rule list in
         let expected = Ok (P.Nest_dot ([ P.Symbol "b" ], P.Symbol "c"), T.Empty_list) in
         Alcotest.(check rule_pp) "simple" expected actual);
@@ -119,11 +119,7 @@ let syntax_rule_parser_test =
           |> list_to_scheme_list
         in
         let actual = S.Rule_parser.syntax_rule list in
-        let expected =
-          Ok
-            ( (P.Nest [], T.Cons (T.Symbol "+", T.Cons (T.Number "1", T.Cons (T.Symbol "b", T.Empty_list)))),
-              T.Empty_list )
-        in
+        let expected = Ok ((P.Nest [], parse "(+ 1 b)"), T.Empty_list) in
         Alcotest.(check rule_pp) "simple" expected actual);
   ]
 

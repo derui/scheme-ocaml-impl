@@ -16,15 +16,15 @@ let tests =
         let expected = "()" in
         Alcotest.(check string) "empty list" actual expected);
     Alcotest.test_case "print list" `Quick (fun () ->
-        let actual = T.Cons (T.Symbol "a", T.Empty_list) |> P.print in
+        let actual = T.(cons (T.Symbol "a") T.Empty_list) |> P.print in
         let expected = "(a)" in
         Alcotest.(check string) "list" actual expected);
     Alcotest.test_case "print nested list" `Quick (fun () ->
-        let actual = T.Cons (T.Symbol "a", T.Cons (T.Cons (T.False, T.Empty_list), T.Empty_list)) |> P.print in
+        let actual = T.(cons (Symbol "a") @@ cons (cons False Empty_list) Empty_list) |> P.print in
         let expected = "(a (#f))" in
         Alcotest.(check string) "list" actual expected);
     Alcotest.test_case "print dotted list" `Quick (fun () ->
-        let actual = T.Cons (T.Symbol "a", T.Cons (T.Cons (T.False, T.True), T.Number "15")) |> P.print in
+        let actual = T.(cons (Symbol "a") @@ cons (cons False T.True) (T.Number "15")) |> P.print in
         let expected = "(a (#f . #t) . 15)" in
         Alcotest.(check string) "list" actual expected);
   ]

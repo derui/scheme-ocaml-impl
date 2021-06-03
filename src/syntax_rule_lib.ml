@@ -47,11 +47,11 @@ module List_parser = struct
   let ( *< ) p p2 = Infix.((fun x _ -> x) <$> p <*> p2)
 
   let element = function
-    | T.Empty_list               -> T.raise_syntax_error "end of list"
-    | Cons (v, (Cons _ as rest)) -> Ok (v, rest)
-    | Cons (v, T.Empty_list)     -> Ok (v, Empty_list)
-    | Cons (v, k)                -> Ok (v, k)
-    | _ as v                     -> T.raise_syntax_error (Printf.sprintf "malformed list: %s" @@ Pr.print v)
+    | T.Empty_list                           -> T.raise_syntax_error "end of list"
+    | Cons { car = v; cdr = Cons _ as rest } -> Ok (v, rest)
+    | Cons { car = v; cdr = T.Empty_list }   -> Ok (v, Empty_list)
+    | Cons { car = v; cdr = k }              -> Ok (v, k)
+    | _ as v                                 -> T.raise_syntax_error (Printf.sprintf "malformed list: %s" @@ Pr.print v)
 
   let cdr = function
     | T.Empty_list -> T.raise_syntax_error "should be end"
@@ -249,11 +249,13 @@ module Syntax_rules = struct
       | T.Symbol v when level > 0 ->
           if List.mem v variables_in_level then Ok rule else T.raise_error (Printf.sprintf "Invalid level: %s" v)
       | T.Symbol _ -> Ok rule
-      | T.Cons (T.Symbol e, T.Cons (T.Symbol e', T.Empty_list)) when e = ellipsis && e' = ellipsis -> Ok rule
-      | T.Cons (v, T.Cons (T.Symbol e, rest)) when e = ellipsis ->
+      | T.Cons { car = T.Symbol e; cdr = T.Cons { car = T.Symbol e'; cdr = T.Empty_list } }
+        when e = ellipsis && e' = ellipsis ->
+          Ok rule
+      | T.Cons { car = v; cdr = T.Cons { car = T.Symbol e; cdr = rest } } when e = ellipsis ->
           let* _ = validate_template' (succ level) v in
           validate_template' level rest
-      | T.Cons (v, rest) ->
+      | T.Cons { car = v; cdr = rest } ->
           let* _ = validate_template' level v in
           validate_template' level rest
       | T.Empty_list -> Ok rule
@@ -269,7 +271,7 @@ module Syntax_rules = struct
       | Nest patterns -> List.fold_left collect_symbols accum patterns
       | Nest_dot (patterns, dot) -> List.fold_left collect_symbols accum (dot :: patterns)
       | Nest_ellipsis (patterns, _, rest) -> List.fold_left collect_symbols accum (patterns @ rest)
-      | Nest_ellipsis_dot (patterns, _, rest, dot) -> List.fold_left collect_symbols accum ((dot :: patterns) @ rest)
+      | Nest_ellipsis_dot (patterns, _, rest, dot) -> List.fold_left collect_symbols accum (dot :: patterns @ rest)
     in
     let symbols = collect_symbols [] (Syntax_rule.pattern rule) in
     let uniq_symbols = List.sort_uniq String.compare symbols in
@@ -290,7 +292,7 @@ module Syntax_rules = struct
       | p :: P.Symbol v :: rest when v = ellipsis -> (
           match dot with
           | Some dot -> P.Nest_ellipsis_dot (List.rev accum, p, rest, dot)
-          | None     -> P.Nest_ellipsis (List.rev accum, p, rest) )
+          | None     -> P.Nest_ellipsis (List.rev accum, p, rest))
       | [] -> P.Nest (List.rev accum)
       | v :: rest -> change_pattern_type (v :: accum) dot rest
     in
@@ -363,7 +365,7 @@ module Rule_parser = struct
           let cdr_p =
             L.(
               cdr >>= fun v ->
-              lift pattern (T.Cons (v, T.Empty_list)) >>= fun v -> pure (Some v))
+              lift pattern (T.cons v T.Empty_list) >>= fun v -> pure (Some v))
           in
           L.(cdr_p <|> pure None)
         in
@@ -382,7 +384,7 @@ module Rule_parser = struct
       let cdr_p =
         L.(
           cdr >>= fun v ->
-          lift pattern (T.Cons (v, T.Empty_list)) >>= fun v -> pure (Some v))
+          lift pattern (T.cons v T.Empty_list) >>= fun v -> pure (Some v))
       in
       L.(cdr_p <|> pure None)
     in

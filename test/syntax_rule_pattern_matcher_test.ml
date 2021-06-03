@@ -36,12 +36,7 @@ let matcher_tests =
         let syntax_rules = parse_syntax_rules "(() ((_ a) 1))" in
         let data = parse "((a b c))" in
         let actual = M.match_syntax_rules ~syntax_rules ~data in
-        let expected =
-          M.Pattern_matcher.(
-            make ()
-            |> put_pattern_variable ("a", 0)
-                 T.Constructor.(cons (symbol "a") @@ cons (symbol "b") @@ cons (symbol "c") T.Empty_list))
-        in
+        let expected = M.Pattern_matcher.(make () |> put_pattern_variable ("a", 0) (parse "(a b c)")) in
         let expected = Some (expected, List.hd syntax_rules.syntax_rules) in
 
         Alcotest.(check result_t) "matched" expected actual);

@@ -13,19 +13,21 @@ let make expr =
 
 let clone t = { expression = t.expression; rest_expression = t.rest_expression }
 
-let current t = match t.rest_expression with None -> None | Some (T.Cons (v, _)) -> Some v | Some v -> Some v
+let current t = match t.rest_expression with None -> None | Some (T.Cons { car = v; _ }) -> Some v | Some v -> Some v
 
 let next t =
   let rest =
     match t.rest_expression with
-    | Some (T.Cons (_, Empty_list)) -> None
-    | Some (T.Cons (_, rest))       -> Some rest
-    | _                             -> None
+    | Some (T.Cons { cdr = Empty_list; _ }) -> None
+    | Some (T.Cons { cdr = rest; _ })       -> Some rest
+    | _                                     -> None
   in
   { t with rest_expression = rest }
 
 let replace_current t expr =
   let rest_expression =
-    match t.rest_expression with Some (T.Cons (_, rest)) -> Some (T.Cons (expr, rest)) | _ -> None
+    match t.rest_expression with
+    | Some (T.Cons { cdr = rest; _ }) -> Some (T.Cons { car = expr; cdr = rest })
+    | _                               -> None
   in
   { t with rest_expression }

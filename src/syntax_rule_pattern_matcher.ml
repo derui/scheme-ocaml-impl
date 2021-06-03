@@ -35,9 +35,9 @@ module Pattern_matcher = struct
   let get_pattern_variable k t = Hashtbl.find_opt t.symbol_table k |> Option.map List.rev
 
   let put_pattern_variable key data t =
-    ( match Hashtbl.find_opt t.symbol_table key with
+    (match Hashtbl.find_opt t.symbol_table key with
     | None       -> Hashtbl.replace t.symbol_table key [ data ]
-    | Some data' -> Hashtbl.replace t.symbol_table key (data :: data') );
+    | Some data' -> Hashtbl.replace t.symbol_table key (data :: data'));
     t
 
   let rec match_pattern pattern datum literal_set level t =
@@ -59,23 +59,23 @@ module Pattern_matcher = struct
   and match_pattern_list patterns data literal_set level t =
     let open Lib.Option.Let_syntax in
     match (patterns, data) with
-    | [ v ], T.Cons (v', T.Empty_list) -> match_pattern v v' literal_set level t
-    | v :: rest, T.Cons (v', rest')    ->
+    | [ v ], T.Cons { car = v'; cdr = T.Empty_list } -> match_pattern v v' literal_set level t
+    | v :: rest, T.Cons { car = v'; cdr = rest' } ->
         let* t = match_pattern v v' literal_set level t in
         match_pattern_list rest rest' literal_set level t
-    | [], T.Empty_list                 -> Some t
-    | _, _                             -> None
+    | [], T.Empty_list -> Some t
+    | _, _ -> None
 
   and match_pattern_dot_list (patterns, dot) data literal_set level t =
     let open Lib.Option.Let_syntax in
     match (patterns, data) with
-    | [ v ], T.Cons (v', dot')      ->
+    | [ v ], T.Cons { car = v'; cdr = dot' } ->
         let* _ = match_pattern v v' literal_set level t in
         match_pattern dot dot' literal_set level t
-    | v :: rest, T.Cons (v', rest') ->
+    | v :: rest, T.Cons { car = v'; cdr = rest' } ->
         let* _ = match_pattern v v' literal_set level t in
         match_pattern_dot_list (rest, dot) rest' literal_set level t
-    | _, _                          -> None
+    | _, _ -> None
 
   and match_pattern_ellipsis_list (patterns, ellipsis, rest_patterns) data literal_set level t =
     let open Lib.Option.Let_syntax in
@@ -88,10 +88,10 @@ module Pattern_matcher = struct
       if count = 0 then Some data
       else
         match data with
-        | T.Cons (v, rest) ->
+        | T.Cons { car = v; cdr = rest } ->
             let* t = match_pattern ellipsis v literal_set (succ level) t in
             match_ellipsis (pred count) rest t
-        | _                -> None
+        | _                              -> None
     in
     let* data = match_ellipsis ellipsis_count (Internal_lib.tail_list data @@ List.length patterns) t in
     let* t = match_pattern_list rest_patterns data literal_set level t in
@@ -108,10 +108,10 @@ module Pattern_matcher = struct
       if count = 0 then Some t
       else
         match data with
-        | T.Cons (v, rest) ->
+        | T.Cons { car = v; cdr = rest } ->
             let* t = match_pattern ellipsis v literal_set (succ level) t in
             match_ellipsis (pred count) rest t
-        | _                -> None
+        | _                              -> None
     in
     let* t = match_ellipsis ellipsis_count (Internal_lib.tail_list data @@ List.length patterns) t in
     let* t =
