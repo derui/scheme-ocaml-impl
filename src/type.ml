@@ -34,6 +34,7 @@ and special_form =
   | S_lambda
   | S_quote
   | S_unquote
+  | S_unquote_splicing
   | S_quasiquote
 
 and macro_fun = scheme_fun

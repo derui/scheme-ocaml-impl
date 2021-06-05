@@ -20,6 +20,7 @@ let symbol_rest = alphabet | special_char | dot | numeric
 let quasiquote = '`'
 let quote = '\''
 let comma = ','
+let splicing = '@'
 let line_comment = ';'
 
 rule token = parse
@@ -32,6 +33,7 @@ rule token = parse
   | bool_false { BOOL_FALSE }
   | quasiquote {QUASIQUOTE}
   | quote {QUOTE}
+  | comma splicing {UNQUOTE_SPLICING}
   | comma {UNQUOTE}
   | dot {DOT}
   (* | '"' ("\\a" | "\\b" | "\\t" | "\\n" | "\\r" | "\\\"" | "\\|" | "\\x" hex_scalar ';' | ['\x00'-'\xff'])* as lexeme '"' {STRING lexeme} *)
