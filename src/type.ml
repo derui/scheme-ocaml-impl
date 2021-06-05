@@ -4,10 +4,7 @@ open Data_type
 type data =
   | Symbol        of string
   | Number        of string
-  | Cons          of {
-      mutable car : data;
-      mutable cdr : data;
-    }
+  | Cons          of cell
   | True
   | False
   | Scheme_string of Scheme_char.t list
@@ -22,6 +19,11 @@ type data =
   | Syntax        of special_form
   | Macro         of macro_fun
   | Undef
+
+and cell = {
+  mutable car : data;
+  mutable cdr : data;
+}
 
 and scheme_fun = data -> data evaluation_result
 (** A type of function in scheme. All scheme's functions has this type. *)
