@@ -57,6 +57,8 @@ let eval_lambda env v =
 
 let unquote_binded env = match E.get env ~key:"unquote" with None -> false | Some v -> v = T.Syntax T.S_unquote
 
+type qq_context = { before_splicing : T.data option }
+
 let eval_quasiquote env v =
   (* unwrap first *)
   let rec list_to_cons accum list =
@@ -67,6 +69,10 @@ let eval_quasiquote env v =
   let quote v =
     let f = T.Symbol "quote" in
     T.(cons f @@ cons v T.Empty_list)
+  in
+  let append pre list after =
+    let f = T.Primitive_fun Primitive_op.List_op.Export.append in
+    T.(cons f @@ cons pre @@ cons list @@ cons after T.Empty_list)
   in
   match v with
   | T.Cons { car = Cons _ as v; cdr = T.Empty_list } ->
@@ -80,6 +86,14 @@ let eval_quasiquote env v =
             eval_quasiquote' (body :: accum) rest
         | Cons { car = Cons { car = Symbol "unquote"; _ } as body; cdr = rest } when not @@ unquote_binded env ->
             eval_quasiquote' (quote body :: accum) rest
+        | Cons
+            {
+              car = Cons { car = Symbol "unquote-splicing"; cdr = T.Cons { car = T.Cons _ as body; _ }; _ };
+              cdr = rest;
+            } ->
+            let pre_splicing = list_to_cons T.Empty_list accum in
+            let after = eval_quasiquote' [] rest in
+            append pre_splicing body after
         | Cons { car = Cons _ as v; cdr = rest } ->
             let v = eval_quasiquote' [] v in
             eval_quasiquote' (v :: accum) rest
@@ -89,6 +103,8 @@ let eval_quasiquote env v =
       let body = eval_quasiquote' [] v in
       Printf.printf "expanded: %s\n" @@ Printer.print body;
       Ok body
+  | T.Cons { car = Cons { car = Symbol "unquote-splicing"; _ }; _ } ->
+      T.raise_syntax_error "unquote-splicing can not use in this context"
   | T.Cons { car = v; cdr = T.Empty_list } -> Ok (quote v)
   | _ -> T.raise_syntax_error @@ Printf.sprintf "Invalid syntax: quasiquote: %s" @@ Printer.print v
 

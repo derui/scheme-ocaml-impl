@@ -79,6 +79,8 @@ module List_op = struct
     let reverse = (D.Argument_formal.Fixed [ "list" ], reverse)
 
     let cons = (D.Argument_formal.Fixed [ "v1"; "v2" ], cons)
+
+    let append = (D.Argument_formal.Any "list", append)
   end
 end
 
