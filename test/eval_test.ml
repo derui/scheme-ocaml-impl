@@ -108,4 +108,32 @@ let tests =
         let actual = Eval.eval ~env @@ parse "`(1 (+ ,(+ 3 5) 3) `,4)" in
         let expected = Ok (parse "(1 (+ 8 3) (quasiquote (unquote 4)))") in
         Alcotest.(check @@ result data error_t) "false" expected actual);
+    Alcotest.test_case "should be able to evaluate unquote-splicing" `Quick (fun () ->
+        let env =
+          E.make
+            [
+              ("quasiquote", T.Syntax T.S_quasiquote);
+              ("unquote", T.Syntax T.S_unquote);
+              ("unquote-splicing", T.Syntax T.S_unquote_splicing);
+              ("quote", T.Syntax T.S_quote);
+              ("+", T.Primitive_fun P.Number_op.Export.plus);
+            ]
+        in
+        let actual = Eval.eval ~env @@ parse "`(1 (+ ,@'(3 5) 3))" in
+        let expected = Ok (parse "(1 (+ 3 5 3))") in
+        Alcotest.(check @@ result data error_t) "false" expected actual);
+    Alcotest.test_case "should be able to evaluate unquote-splicing multiple times" `Quick (fun () ->
+        let env =
+          E.make
+            [
+              ("quasiquote", T.Syntax T.S_quasiquote);
+              ("unquote", T.Syntax T.S_unquote);
+              ("unquote-splicing", T.Syntax T.S_unquote_splicing);
+              ("quote", T.Syntax T.S_quote);
+              ("+", T.Primitive_fun P.Number_op.Export.plus);
+            ]
+        in
+        let actual = Eval.eval ~env @@ parse "`(1 (+ ,@'(3 5) 3) ,@'(4 4))" in
+        let expected = Ok (parse "(1 (+ 3 5 3) 4 4)") in
+        Alcotest.(check @@ result data error_t) "false" expected actual);
   ]

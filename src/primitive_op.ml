@@ -8,6 +8,20 @@ module List_op = struct
 
   let cdr arg = match arg with T.Cons { car = Cons { cdr = v; _ }; _ } -> Ok v | _ -> T.raise_error "pair requirement"
 
+  let set_car arg =
+    match arg with
+    | T.Cons { car = Cons cell; cdr = Cons { car = v; _ } } ->
+        cell.car <- v;
+        Ok T.Undef
+    | _ -> T.raise_error "pair requirement"
+
+  let set_cdr arg =
+    match arg with
+    | T.Cons { car = Cons cell; cdr = Cons { car = v; _ } } ->
+        cell.cdr <- v;
+        Ok T.Undef
+    | _ -> T.raise_error "pair requirement"
+
   let cons arg =
     match arg with
     | T.Cons { car = v; cdr = T.Cons { car = v2; _ } } -> Ok (T.Cons { car = v; cdr = v2 })
@@ -33,17 +47,27 @@ module List_op = struct
     reverse' Empty_list arg
 
   let append arg =
+    let open Lib.Result.Let_syntax in
     let list, _ = Internal_lib.scheme_list_to_list arg in
     let list = list |> List.filter (function T.Empty_list -> false | _ -> true) in
     match list with
     | []    -> Ok T.Empty_list
     | [ v ] -> Ok v
     | _     ->
-        let rec append' accum = function
-          | []        -> reverse accum
-          | v :: rest -> append' (T.Cons { car = v; cdr = accum }) rest
+        let rec append' accum = function [] -> accum | v :: rest -> append' (v :: accum) rest in
+        let rec append_list accum = function
+          | [ v ] -> Ok (accum, v)
+          | (T.Cons _ as v) :: rest when T.is_proper_list v ->
+              let accum = Internal_lib.scheme_list_to_list v |> fst |> append' accum in
+              append_list accum rest
+          | _ -> T.raise_error "invalid path"
         in
-        append' T.Empty_list list
+        let rec list_to_cons accum list =
+          let cons car cdr = T.(cons car cdr) in
+          match list with [] -> accum | car :: rest -> list_to_cons (cons car accum) rest
+        in
+        let* accum, v = append_list [] list in
+        Ok (list_to_cons v accum)
 
   module Export = struct
     let length = (D.Argument_formal.Fixed [ "list" ], length)
@@ -55,6 +79,8 @@ module List_op = struct
     let reverse = (D.Argument_formal.Fixed [ "list" ], reverse)
 
     let cons = (D.Argument_formal.Fixed [ "v1"; "v2" ], cons)
+
+    let append = (D.Argument_formal.Any "list", append)
   end
 end
 

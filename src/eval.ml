@@ -154,13 +154,13 @@ let eval ~env expr =
         let* evaluated = status.stack |> S.evaluated_values |> Primitive_op.List_op.reverse in
         let pop v = I.(pop_continuation instance v) |> Result.ok in
         match form with
-        | T.S_if         -> Special_form.eval_if status.env evaluated >>= pop
-        | T.S_define     -> Special_form.eval_define status.env evaluated >>= pop
-        | T.S_set_force  -> Special_form.eval_set_force status.env evaluated >>= pop
-        | T.S_quote      -> Special_form.eval_quote status.env evaluated >>= pop
-        | T.S_lambda     -> Special_form.eval_lambda status.env evaluated >>= pop
-        | T.S_unquote    -> Special_form.eval_lambda status.env evaluated >>= pop
-        | T.S_quasiquote -> T.raise_syntax_error "Invalid evaluation process")
+        | T.S_if        -> Special_form.eval_if status.env evaluated >>= pop
+        | T.S_define    -> Special_form.eval_define status.env evaluated >>= pop
+        | T.S_set_force -> Special_form.eval_set_force status.env evaluated >>= pop
+        | T.S_quote     -> Special_form.eval_quote status.env evaluated >>= pop
+        | T.S_lambda    -> Special_form.eval_lambda status.env evaluated >>= pop
+        | T.S_unquote   -> Special_form.eval_unquote status.env evaluated >>= pop
+        | _             -> T.raise_syntax_error "Invalid evaluation process")
     | For_expression ->
         let value = match status.stack |> S.evaluated_values with T.Cons { car = v; _ } -> v | _ as v -> v in
         I.(pop_continuation instance value) |> Result.ok

@@ -7,7 +7,7 @@
 %token <string> NUMBER
 %token <string list> STRING
 %token EOF LEFT_PAREN RIGHT_PAREN BOOL_TRUE BOOL_FALSE
-%token QUASIQUOTE QUOTE UNQUOTE DOT
+%token QUASIQUOTE QUOTE UNQUOTE UNQUOTE_SPLICING DOT
 %type <data list> program
 %type <data> exp
 %start program
@@ -29,6 +29,7 @@ exp:
   | QUASIQUOTE exp { Cons {car = Symbol "quasiquote"; cdr = Cons {car = $2; cdr = Empty_list}} }
   | QUOTE exp { Cons {car = Symbol "quote"; cdr =Cons {car = $2; cdr = Empty_list}} }
   | UNQUOTE exp { Cons {car = Symbol "unquote"; cdr = Cons {car = $2; cdr = Empty_list}} }
+  | UNQUOTE_SPLICING exp { Cons {car = Symbol "unquote-splicing"; cdr = Cons {car = $2; cdr = Empty_list}} }
 
 scheme_list:
   | LEFT_PAREN scheme_list_body { $2 }
