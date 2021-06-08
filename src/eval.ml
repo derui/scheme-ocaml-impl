@@ -34,7 +34,7 @@ module Evaluation_status = struct
   let is_syntax { evaluating_for; _ } = match evaluating_for with For_syntax _ -> true | _ -> false
 end
 
-let eval_apply stack =
+let eval_apply continuation stack =
   let open Lib.Result.Infix in
   let open Lib.Result.Let_syntax in
   let rec argument_to_list evaled arg =
@@ -62,18 +62,20 @@ let eval_apply stack =
         (sym, rest_binding) :: bindings |> Result.ok
   in
 
-  let* values = S.evaluated_values stack |> Primitive_op.List_op.reverse in
+  let* values = S.evaluated_values stack |> Internal_lib.reverse in
   let* operator, args =
     match values with
     | T.Cons { car = operator; cdr = args } -> Ok (operator, args)
     | _                                     -> T.raise_error
                                                  (Printf.sprintf "Invalid application: %s" @@ Printer.print values)
   in
+  let module I = (val continuation : C.Instance with type status = Evaluation_status.t) in
+  let cont v = I.(pop_continuation instance v) in
   match operator with
   | T.Primitive_fun (formal, f)            ->
       Printf.printf "call primitive\n";
       let* validated_args = Internal_lib.validate_arguments formal args in
-      let* value = f validated_args in
+      let* value = f cont validated_args in
       Ok (`Value value)
   | Closure { env; argument_formal; body } ->
       let* data = Internal_lib.validate_arguments argument_formal args in
@@ -138,7 +140,7 @@ let eval ~env expr =
         Printf.printf "pop value: %s\n" @@ Printer.print value;
         I.(pop_continuation instance value) |> Result.ok
     | Evaluation_status.For_application -> (
-        let* evaled = eval_apply status.stack in
+        let* evaled = eval_apply (module I) status.stack in
         match evaled with
         | `Value value              -> I.(pop_continuation instance value) |> Result.ok
         | `Call_closure (env, body) ->
@@ -151,7 +153,7 @@ let eval ~env expr =
             I.(push_continuation instance new_status) |> Result.ok)
     | For_syntax form -> (
         let open Lib.Result.Infix in
-        let* evaluated = status.stack |> S.evaluated_values |> Primitive_op.List_op.reverse in
+        let* evaluated = status.stack |> S.evaluated_values |> Internal_lib.reverse in
         let pop v = I.(pop_continuation instance v) |> Result.ok in
         match form with
         | T.S_if        -> Special_form.eval_if status.env evaluated >>= pop
