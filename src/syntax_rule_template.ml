@@ -5,7 +5,7 @@ module T = Type
 
 type expanded = T.data
 
-let reverse v = Primitive_op.List_op.reverse v |> Result.get_ok
+let reverse v = Internal_lib.reverse v |> Result.get_ok
 
 let apply_expanded accum expanded = List.fold_left (fun accum v -> T.cons v accum) accum expanded
 

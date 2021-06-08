@@ -4,49 +4,45 @@ module T = Type
 module D = Data_type
 
 module List_op = struct
-  let car arg = match arg with T.Cons { car = Cons { car = v; _ }; _ } -> Ok v | _ -> T.raise_error "pair requirement"
+  let car _ arg =
+    match arg with T.Cons { car = Cons { car = v; _ }; _ } -> Ok v | _ -> T.raise_error "pair requirement"
 
-  let cdr arg = match arg with T.Cons { car = Cons { cdr = v; _ }; _ } -> Ok v | _ -> T.raise_error "pair requirement"
+  let cdr _ arg =
+    match arg with T.Cons { car = Cons { cdr = v; _ }; _ } -> Ok v | _ -> T.raise_error "pair requirement"
 
-  let set_car arg =
+  let set_car _ arg =
     match arg with
     | T.Cons { car = Cons cell; cdr = Cons { car = v; _ } } ->
         cell.car <- v;
         Ok T.Undef
     | _ -> T.raise_error "pair requirement"
 
-  let set_cdr arg =
+  let set_cdr _ arg =
     match arg with
     | T.Cons { car = Cons cell; cdr = Cons { car = v; _ } } ->
         cell.cdr <- v;
         Ok T.Undef
     | _ -> T.raise_error "pair requirement"
 
-  let cons arg =
+  let cons _ arg =
     match arg with
     | T.Cons { car = v; cdr = T.Cons { car = v2; _ } } -> Ok (T.Cons { car = v; cdr = v2 })
     | _ -> T.raise_error "two argument requirement"
 
-  let is_pair arg = match arg with T.Cons _ | T.Empty_list -> Ok T.True | _ -> Ok T.False
+  let is_pair _ arg = match arg with T.Cons _ | T.Empty_list -> Ok T.True | _ -> Ok T.False
 
-  let length arg =
+  let length cont arg =
     let open Lib.Result.Let_syntax in
     match arg with
     | T.Cons { car = T.Empty_list; cdr = T.Empty_list } -> T.Number "0" |> Result.ok
     | _ ->
-        let* arg = car arg in
+        let* arg = car cont arg in
         let len = Internal_lib.length_of_list arg in
         T.Number (string_of_int len) |> Result.ok
 
-  let reverse arg =
-    let rec reverse' accum = function
-      | T.Empty_list                 -> Ok accum
-      | Cons { car = v; cdr = rest } -> reverse' (T.Cons { car = v; cdr = accum }) rest
-      | _                            -> T.raise_error @@ Printf.sprintf "%s is not proper list" @@ Printer.print arg
-    in
-    reverse' Empty_list arg
+  let reverse _ arg = Internal_lib.reverse arg
 
-  let append arg =
+  let append _ arg =
     let open Lib.Result.Let_syntax in
     let list, _ = Internal_lib.scheme_list_to_list arg in
     let list = list |> List.filter (function T.Empty_list -> false | _ -> true) in
@@ -85,7 +81,7 @@ module List_op = struct
 end
 
 module Number_op = struct
-  let plus args =
+  let plus _ args =
     let open Lib.Result.Let_syntax in
     let rec plus' accum v =
       match v with

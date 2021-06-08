@@ -58,3 +58,11 @@ let tail_list arg n =
       | _                                    -> failwith "Invalid argument"
   in
   loop n arg
+
+let reverse arg =
+  let rec reverse' accum = function
+    | T.Empty_list                 -> Ok accum
+    | Cons { car = v; cdr = rest } -> reverse' (T.Cons { car = v; cdr = accum }) rest
+    | _                            -> T.raise_error @@ Printf.sprintf "%s is not proper list" @@ Printer.print arg
+  in
+  reverse' Empty_list arg

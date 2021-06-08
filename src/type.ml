@@ -41,7 +41,9 @@ and special_form =
 
 and macro_fun = scheme_fun
 
-and primitive_fun = Argument_formal.t * scheme_fun
+and continuation = data -> unit
+
+and primitive_fun = Argument_formal.t * (continuation -> data -> data evaluation_result)
 
 and env = data Environment.t
 
