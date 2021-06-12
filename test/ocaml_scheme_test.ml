@@ -15,6 +15,7 @@ let tests =
     ("Primitive operations", Primitive_op_test.tests);
     ("Library", Library_test.tests);
     ("List parser", List_parser_test.tests);
+    ("Import", Import_test.tests);
   ]
 
 let () = Alcotest.run "OCaml scheme learning" tests
