@@ -50,8 +50,52 @@ let tests =
             {
               P.Library_declaration.empty with
               P.Library_declaration.import_declaration =
-                Some { I.Import_declaration.import_sets = [ I.Import_set.Library_name [ "a"; "b" ] ] };
+                [ { I.Import_declaration.import_sets = [ I.Import_set.Library_name [ "a"; "b" ] ] } ];
             }
+        in
+        Alcotest.(check @@ result library_t error_t) "simple" expected actual);
+    Alcotest.test_case "Library parser: parse some declaration" `Quick (fun () ->
+        let v = parse "((a b) (import (a b)) (begin a b 1))" in
+        let actual = P.parse v in
+        let expected =
+          Ok
+            {
+              P.Library_declaration.empty with
+              import_declaration = [ { I.Import_declaration.import_sets = [ I.Import_set.Library_name [ "a"; "b" ] ] } ];
+              begin_declaration = [ T.Symbol "a"; T.Symbol "b"; T.Number "1" ];
+            }
+        in
+        Alcotest.(check @@ result library_t error_t) "simple" expected actual);
+    Alcotest.test_case "Library parser: parse include declaration" `Quick (fun () ->
+        let v = parse {|( (a b) (include "foo" "bar") )|} in
+        let actual = P.parse v in
+        let expected =
+          Ok { P.Library_declaration.empty with P.Library_declaration.include_declaration = [ "foo"; "bar" ] }
+        in
+        Alcotest.(check @@ result library_t error_t) "simple" expected actual);
+    Alcotest.test_case "Library parser: parse include declaration multiple times" `Quick (fun () ->
+        let v = parse {| ((a b) (include "foo" "bar") (include "foobar.scm")) |} in
+        let actual = P.parse v in
+        let expected =
+          Ok
+            {
+              P.Library_declaration.empty with
+              P.Library_declaration.include_declaration = [ "foo"; "bar"; "foobar.scm" ];
+            }
+        in
+        Alcotest.(check @@ result library_t error_t) "simple" expected actual);
+    Alcotest.test_case "Library parser: parse include-ci declaration" `Quick (fun () ->
+        let v = parse {|( (a b) (include-ci "foo" "bar") )|} in
+        let actual = P.parse v in
+        let expected =
+          Ok { P.Library_declaration.empty with P.Library_declaration.include_ci_declaration = [ "foo"; "bar" ] }
+        in
+        Alcotest.(check @@ result library_t error_t) "simple" expected actual);
+    Alcotest.test_case "Library parser: parse include-ci declaration multiple times" `Quick (fun () ->
+        let v = parse {|( (a b) (include-ci "foo" "bar") (include-ci "baz"))|} in
+        let actual = P.parse v in
+        let expected =
+          Ok { P.Library_declaration.empty with P.Library_declaration.include_ci_declaration = [ "foo"; "bar"; "baz" ] }
         in
         Alcotest.(check @@ result library_t error_t) "simple" expected actual);
   ]

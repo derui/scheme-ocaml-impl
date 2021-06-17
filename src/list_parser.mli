@@ -66,3 +66,6 @@ val chainl1 : 'a t -> ('a -> 'a -> 'a) t -> 'a t
 
 val chainl : 'a t -> ('a -> 'a -> 'a) t -> 'a -> 'a t
 (** [chainl v f] convert two elements into one element. *)
+
+val nest : 'a t -> Type.data -> 'a t
+(** [nest p list] return new parser to nest with other list *)

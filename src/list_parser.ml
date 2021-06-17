@@ -101,3 +101,6 @@ let chainl1 : 'a t -> ('a -> 'a -> 'a) t -> 'a t =
 
 (* chain zero or more repeated operator to result of parser. *)
 let chainl p op a = chainl1 p op <|> pure a
+
+(* nest other parser with other list *)
+let nest p data = match p data with Ok (v, _) -> fun data -> Ok (v, data) | Error _ -> zero
