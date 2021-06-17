@@ -53,13 +53,6 @@ let string = L.satisfy (function T.Scheme_string _ -> true | _ -> false)
 
 let pair = L.satisfy (function T.Cons _ -> true | _ -> false)
 
-let identifiers =
-  let open L.Infix in
-  let to_list v =
-    List.fold_left (fun accum v -> match v with T.Symbol ident -> ident :: accum | _ -> accum) [] v |> List.rev
-  in
-  to_list <$> L.many symbol
-
 let identifier =
   let open L.Let_syntax in
   let* v = symbol in
