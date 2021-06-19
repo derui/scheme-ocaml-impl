@@ -18,7 +18,7 @@ let tests =
     Alcotest.test_case "Library parser: parse empty declaration" `Quick (fun () ->
         let v = parse "((a b))" in
         let actual = P.parse v in
-        let expected = Ok P.Library_declaration.empty in
+        let expected = Ok { P.Library_declaration.empty with name = [ T.Symbol "a"; T.Symbol "b" ] } in
         Alcotest.(check @@ result library_t error_t) "simple" expected actual);
     Alcotest.test_case "Library parser: parse export declaration" `Quick (fun () ->
         let v = parse "((a b) (export a b (rename c d)))" in
@@ -27,7 +27,8 @@ let tests =
           Ok
             {
               P.Library_declaration.empty with
-              P.Library_declaration.export_declaration = [ P.Export_spec.Ident "a"; Ident "b"; Rename ("c", "d") ];
+              export_declaration = [ P.Export_spec.Ident "a"; Ident "b"; Rename ("c", "d") ];
+              name = [ T.Symbol "a"; T.Symbol "b" ];
             }
         in
         Alcotest.(check @@ result library_t error_t) "simple" expected actual);
@@ -38,7 +39,8 @@ let tests =
           Ok
             {
               P.Library_declaration.empty with
-              P.Library_declaration.begin_declaration = [ T.Symbol "a"; T.Symbol "b"; T.Number "1" ];
+              begin_declaration = [ T.Symbol "a"; T.Symbol "b"; T.Number "1" ];
+              name = [ T.Symbol "a"; T.Symbol "b" ];
             }
         in
         Alcotest.(check @@ result library_t error_t) "simple" expected actual);
@@ -49,8 +51,8 @@ let tests =
           Ok
             {
               P.Library_declaration.empty with
-              P.Library_declaration.import_declaration =
-                [ { I.Import_declaration.import_sets = [ I.Import_set.Library_name [ "a"; "b" ] ] } ];
+              import_declaration = [ { I.Import_declaration.import_sets = [ I.Import_set.Library_name [ "a"; "b" ] ] } ];
+              name = [ T.Symbol "a"; T.Symbol "b" ];
             }
         in
         Alcotest.(check @@ result library_t error_t) "simple" expected actual);
@@ -63,6 +65,7 @@ let tests =
               P.Library_declaration.empty with
               import_declaration = [ { I.Import_declaration.import_sets = [ I.Import_set.Library_name [ "a"; "b" ] ] } ];
               begin_declaration = [ T.Symbol "a"; T.Symbol "b"; T.Number "1" ];
+              name = [ T.Symbol "a"; T.Symbol "b" ];
             }
         in
         Alcotest.(check @@ result library_t error_t) "simple" expected actual);
@@ -70,7 +73,12 @@ let tests =
         let v = parse {|( (a b) (include "foo" "bar") )|} in
         let actual = P.parse v in
         let expected =
-          Ok { P.Library_declaration.empty with P.Library_declaration.include_declaration = [ "foo"; "bar" ] }
+          Ok
+            {
+              P.Library_declaration.empty with
+              include_declaration = [ "foo"; "bar" ];
+              name = [ T.Symbol "a"; T.Symbol "b" ];
+            }
         in
         Alcotest.(check @@ result library_t error_t) "simple" expected actual);
     Alcotest.test_case "Library parser: parse include declaration multiple times" `Quick (fun () ->
@@ -80,7 +88,8 @@ let tests =
           Ok
             {
               P.Library_declaration.empty with
-              P.Library_declaration.include_declaration = [ "foo"; "bar"; "foobar.scm" ];
+              include_declaration = [ "foo"; "bar"; "foobar.scm" ];
+              name = [ T.Symbol "a"; T.Symbol "b" ];
             }
         in
         Alcotest.(check @@ result library_t error_t) "simple" expected actual);
@@ -88,21 +97,36 @@ let tests =
         let v = parse {|( (a b) (include-ci "foo" "bar") )|} in
         let actual = P.parse v in
         let expected =
-          Ok { P.Library_declaration.empty with P.Library_declaration.include_ci_declaration = [ "foo"; "bar" ] }
+          Ok
+            {
+              P.Library_declaration.empty with
+              include_ci_declaration = [ "foo"; "bar" ];
+              name = [ T.Symbol "a"; T.Symbol "b" ];
+            }
         in
         Alcotest.(check @@ result library_t error_t) "simple" expected actual);
     Alcotest.test_case "Library parser: parse include-ci declaration multiple times" `Quick (fun () ->
         let v = parse {|( (a b) (include-ci "foo" "bar") (include-ci "baz"))|} in
         let actual = P.parse v in
         let expected =
-          Ok { P.Library_declaration.empty with P.Library_declaration.include_ci_declaration = [ "foo"; "bar"; "baz" ] }
+          Ok
+            {
+              P.Library_declaration.empty with
+              include_ci_declaration = [ "foo"; "bar"; "baz" ];
+              name = [ T.Symbol "a"; T.Symbol "b" ];
+            }
         in
         Alcotest.(check @@ result library_t error_t) "simple" expected actual);
     Alcotest.test_case "Library parser: parse include-library-declarations declaration" `Quick (fun () ->
         let v = parse {|( (a b) (include-library-declarations "foo" "bar") )|} in
         let actual = P.parse v in
         let expected =
-          Ok { P.Library_declaration.empty with P.Library_declaration.include_library_declarations = [ "foo"; "bar" ] }
+          Ok
+            {
+              P.Library_declaration.empty with
+              include_library_declarations = [ "foo"; "bar" ];
+              name = [ T.Symbol "a"; T.Symbol "b" ];
+            }
         in
         Alcotest.(check @@ result library_t error_t) "simple" expected actual);
     Alcotest.test_case "Library parser: parse include-library-declarations declaration multiple times" `Quick (fun () ->
@@ -112,7 +136,8 @@ let tests =
           Ok
             {
               P.Library_declaration.empty with
-              P.Library_declaration.include_library_declarations = [ "foo"; "bar"; "baz" ];
+              include_library_declarations = [ "foo"; "bar"; "baz" ];
+              name = [ T.Symbol "a"; T.Symbol "b" ];
             }
         in
         Alcotest.(check @@ result library_t error_t) "simple" expected actual);

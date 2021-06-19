@@ -10,6 +10,7 @@ end
 (** The type of library declaration *)
 module Library_declaration : sig
   type t = {
+    name : Type.data list;
     export_declaration : Export_spec.t list;
     import_declaration : Import.Import_declaration.t list;
     begin_declaration : Type.data list;

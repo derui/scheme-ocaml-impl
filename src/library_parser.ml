@@ -11,6 +11,7 @@ end
 
 module Library_declaration = struct
   type t = {
+    name : T.data list;
     export_declaration : Export_spec.t list;
     import_declaration : Import.Import_declaration.t list;
     begin_declaration : T.data list;
@@ -35,6 +36,7 @@ module Library_declaration = struct
 
   let empty =
     {
+      name = [];
       export_declaration = [];
       import_declaration = [];
       begin_declaration = [];
@@ -54,6 +56,8 @@ type declaration =
 
 let symbol = L.satisfy (function T.Symbol _ -> true | _ -> false)
 
+let number = L.satisfy (function T.Number _ -> true | _ -> false)
+
 let string = L.satisfy (function T.Scheme_string _ -> true | _ -> false)
 
 let pair = L.satisfy (function T.Cons _ -> true | _ -> false)
@@ -62,6 +66,15 @@ let identifier =
   let open L.Let_syntax in
   let* v = symbol in
   match v with T.Symbol v -> L.pure v | _ -> L.zero
+
+let name =
+  let open L.Let_syntax in
+  let* names = pair in
+  let p =
+    let* idents = L.many1 L.(symbol <|> number) in
+    L.pure idents
+  in
+  L.nest p names
 
 let export_spec =
   let open L.Let_syntax in
@@ -149,7 +162,7 @@ let include_library_declarations =
 let parse v =
   let open L.Let_syntax in
   let p =
-    let* _ = pair in
+    let* name = name in
     let* declarations =
       L.(
         many
@@ -183,7 +196,7 @@ let parse v =
                                                 accum with
                                                 include_ci_declaration = List.concat [ accum.include_ci_declaration; v ];
                                               })
-        Library_declaration.empty declarations
+        { Library_declaration.empty with name } declarations
     in
     L.pure declaration
   in
