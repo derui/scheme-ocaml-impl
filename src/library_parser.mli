@@ -15,6 +15,7 @@ module Library_declaration : sig
     begin_declaration : Type.data list;
     include_declaration : string list;
     include_ci_declaration : string list;
+    include_library_declarations : string list;
   }
 
   val show : t -> string

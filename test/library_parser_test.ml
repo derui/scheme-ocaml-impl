@@ -98,4 +98,22 @@ let tests =
           Ok { P.Library_declaration.empty with P.Library_declaration.include_ci_declaration = [ "foo"; "bar"; "baz" ] }
         in
         Alcotest.(check @@ result library_t error_t) "simple" expected actual);
+    Alcotest.test_case "Library parser: parse include-library-declarations declaration" `Quick (fun () ->
+        let v = parse {|( (a b) (include-library-declarations "foo" "bar") )|} in
+        let actual = P.parse v in
+        let expected =
+          Ok { P.Library_declaration.empty with P.Library_declaration.include_library_declarations = [ "foo"; "bar" ] }
+        in
+        Alcotest.(check @@ result library_t error_t) "simple" expected actual);
+    Alcotest.test_case "Library parser: parse include-library-declarations declaration multiple times" `Quick (fun () ->
+        let v = parse {|( (a b) (include-library-declarations "foo" "bar") (include-library-declarations "baz"))|} in
+        let actual = P.parse v in
+        let expected =
+          Ok
+            {
+              P.Library_declaration.empty with
+              P.Library_declaration.include_library_declarations = [ "foo"; "bar"; "baz" ];
+            }
+        in
+        Alcotest.(check @@ result library_t error_t) "simple" expected actual);
   ]

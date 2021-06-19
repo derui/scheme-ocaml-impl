@@ -16,6 +16,7 @@ module Library_declaration = struct
     begin_declaration : T.data list;
     include_declaration : string list;
     include_ci_declaration : string list;
+    include_library_declarations : string list;
   }
 
   let show t =
@@ -26,7 +27,9 @@ module Library_declaration = struct
     let defs = t.begin_declaration |> List.map Printer.print |> String.concat " " in
     let includes = t.include_declaration |> String.concat " " in
     let include_cis = t.include_ci_declaration |> String.concat " " in
-    Printf.sprintf "(%s %s (begin %s) (include %s) (include-ci %s))" export import defs includes include_cis
+    let include_library_declarations = t.include_library_declarations |> String.concat " " in
+    Printf.sprintf "(%s %s (begin %s) (include %s) (include-ci %s) (include-library-declarations %s))" export import
+      defs includes include_cis include_library_declarations
 
   let pp fmt v = Format.fprintf fmt "%s" @@ show v
 
@@ -37,15 +40,17 @@ module Library_declaration = struct
       begin_declaration = [];
       include_declaration = [];
       include_ci_declaration = [];
+      include_library_declarations = [];
     }
 end
 
 type declaration =
-  | Export     of Export_spec.t list
-  | Import     of Import.Import_declaration.t
-  | Begin      of T.data list
-  | Include    of string list
-  | Include_ci of string list
+  | Export                       of Export_spec.t list
+  | Import                       of Import.Import_declaration.t
+  | Begin                        of T.data list
+  | Include                      of string list
+  | Include_ci                   of string list
+  | Include_library_declarations of string list
 
 let symbol = L.satisfy (function T.Symbol _ -> true | _ -> false)
 
@@ -129,6 +134,19 @@ let include_ci_declaration =
   in
   L.nest p pair
 
+let include_library_declarations =
+  let open L.Let_syntax in
+  let* pair = pair in
+  let p =
+    let* _ = L.satisfy (function T.Symbol "include-library-declarations" -> true | _ -> false) in
+    let* includes = L.many1 string in
+    let includes = List.filter_map (function T.Scheme_string v -> Some v | _ -> None) includes in
+    L.pure
+      (Include_library_declarations
+         (List.map (fun chars -> List.map Data_type.Scheme_char.to_string chars |> String.concat "") includes))
+  in
+  L.nest p pair
+
 let parse v =
   let open L.Let_syntax in
   let p =
@@ -137,18 +155,35 @@ let parse v =
       L.(
         many
         @@ (export_declaration <|> import_declaration <|> begin_declaration <|> include_declaration
-          <|> include_ci_declaration))
+          <|> include_ci_declaration <|> include_library_declarations))
     in
 
     let declaration =
       List.fold_left
         (fun (accum : Library_declaration.t) v ->
           match v with
-          | Begin v      -> { accum with begin_declaration = List.concat [ accum.begin_declaration; v ] }
-          | Export v     -> { accum with export_declaration = List.concat [ accum.export_declaration; v ] }
-          | Import v     -> { accum with import_declaration = List.concat [ accum.import_declaration; [ v ] ] }
-          | Include v    -> { accum with include_declaration = List.concat [ accum.include_declaration; v ] }
-          | Include_ci v -> { accum with include_ci_declaration = List.concat [ accum.include_ci_declaration; v ] })
+          | Begin v                        -> {
+                                                accum with
+                                                begin_declaration = List.concat [ accum.begin_declaration; v ];
+                                              }
+          | Export v                       -> {
+                                                accum with
+                                                export_declaration = List.concat [ accum.export_declaration; v ];
+                                              }
+          | Import v                       -> {
+                                                accum with
+                                                import_declaration = List.concat [ accum.import_declaration; [ v ] ];
+                                              }
+          | Include v                      -> {
+                                                accum with
+                                                include_declaration = List.concat [ accum.include_declaration; v ];
+                                              }
+          | Include_library_declarations v ->
+              { accum with include_library_declarations = List.concat [ accum.include_library_declarations; v ] }
+          | Include_ci v                   -> {
+                                                accum with
+                                                include_ci_declaration = List.concat [ accum.include_ci_declaration; v ];
+                                              })
         Library_declaration.empty declarations
     in
     L.pure declaration
