@@ -6,7 +6,7 @@ module Export_map = Map.Make (struct
   let compare = Stdlib.compare
 end)
 
-type name = string list
+type name = string list [@@deriving show]
 
 type exports = string Export_map.t
 

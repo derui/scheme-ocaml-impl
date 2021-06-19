@@ -8,4 +8,5 @@
  (name ocaml_scheme)
  (public_name ocaml-scheme)
  (flags (:standard -safe-string))
- (libraries astring))
+ (libraries astring ppx_show.runtime)
+ (preprocess (pps ppx_show)))

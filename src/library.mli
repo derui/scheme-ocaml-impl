@@ -1,7 +1,7 @@
 type t
 (** the type of library *)
 
-type name = string list
+type name = string list [@@deriving show]
 (** the type of the name of library *)
 
 val show : t -> string
