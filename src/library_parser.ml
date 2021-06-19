@@ -69,7 +69,6 @@ let export_spec =
     let* v = identifier in
     L.pure (Export_spec.Ident v)
   and rename =
-    print_endline "in rename";
     let* pair = pair in
     let p' =
       let* _ = L.satisfy (function T.Symbol "rename" -> true | _ -> false) in
