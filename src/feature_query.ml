@@ -23,16 +23,16 @@ end
 
 module Feature_requirement = struct
   type t =
-    | And                of t * t list
-    | Or                 of t * t list
+    | And                of t * t
+    | Or                 of t * t
     | Not                of t
     | Library            of Library.name
     | Feature_identifier of Feature_identifier.t
   [@@deriving show]
 
-  let ( && ) v rest = And (v, rest)
+  let ( && ) v1 v2 = And (v1, v2)
 
-  let ( || ) v rest = Or (v, rest)
+  let ( || ) v1 v2 = Or (v1, v2)
 
   let ( ! ) v = Not v
 
