@@ -32,8 +32,8 @@ module Make (Library_producer : Library_producer.S) (Feature_query : Feature_que
       match cond with
       | F.Feature_requirement.Library name -> List.exists (fun v -> Library.name v = name) libraries
       | F.Feature_requirement.Feature_identifier v -> Feature_query.is_implemented v
-      | F.Feature_requirement.And (fst, rest) -> match_requirement fst && match_requirement rest
-      | F.Feature_requirement.Or (fst, rest) -> match_requirement fst || match_requirement rest
+      | F.Feature_requirement.And exps -> List.for_all match_requirement exps
+      | F.Feature_requirement.Or exps -> List.exists match_requirement exps
       | F.Feature_requirement.Not v -> not @@ match_requirement v
     in
     match_requirement requirement

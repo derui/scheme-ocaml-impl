@@ -114,7 +114,8 @@ let tests =
         R.define_library lib1;
         let module F = FQ.Feature_identifier in
         let actual =
-          R.is_requirement_filled FQ.Feature_requirement.(Feature_identifier R7RS && Feature_identifier F.Exact_closed)
+          R.is_requirement_filled
+            FQ.Feature_requirement.(And [ Feature_identifier R7RS; Feature_identifier F.Exact_closed ])
         in
         let expected = true in
         Alcotest.(check bool) "lib" actual expected);
@@ -132,7 +133,8 @@ let tests =
         R.define_library lib1;
         let module F = FQ.Feature_identifier in
         let actual =
-          R.is_requirement_filled FQ.Feature_requirement.(Feature_identifier R7RS || Feature_identifier F.Exact_closed)
+          R.is_requirement_filled
+            FQ.Feature_requirement.(Or [ Feature_identifier R7RS; Feature_identifier F.Exact_closed ])
         in
         let expected = true in
         Alcotest.(check bool) "lib" actual expected);
@@ -167,7 +169,8 @@ let tests =
         let module F = FQ.Feature_identifier in
         let actual =
           R.is_requirement_filled
-            FQ.Feature_requirement.((Feature_identifier R7RS || Feature_identifier F.Ratios) && Library [ "name" ])
+            FQ.Feature_requirement.(
+              And [ Or [ Feature_identifier R7RS; Feature_identifier F.Ratios ]; Library [ "name" ] ])
         in
         let expected = true in
         Alcotest.(check bool) "lib" actual expected);

@@ -19,20 +19,27 @@ module Feature_identifier = struct
     | Ratios        -> "ratios"
     | Posix         -> "posix"
     | Windows       -> "windows"
+
+  let features = [ R7RS; Exact_closed; Exact_complex; IEEE_float; Full_unicode; Ratios; Posix; Windows ]
+
+  let is_feature_symbol s =
+    let names = List.map show features in
+    List.mem s names
+
+  let of_string v =
+    let names = List.map (fun v -> (v, show v)) features in
+    let feature = List.find (fun (_, s) -> s = v) names in
+    fst feature
 end
 
 module Feature_requirement = struct
   type t =
-    | And                of t * t
-    | Or                 of t * t
+    | And                of t list
+    | Or                 of t list
     | Not                of t
     | Library            of Library.name
     | Feature_identifier of Feature_identifier.t
   [@@deriving show]
-
-  let ( && ) v1 v2 = And (v1, v2)
-
-  let ( || ) v1 v2 = Or (v1, v2)
 
   let ( ! ) v = Not v
 
