@@ -141,4 +141,31 @@ let tests =
             }
         in
         Alcotest.(check @@ result library_t error_t) "simple" expected actual);
+    Alcotest.test_case "Library parser: parse cond-expand declaration" `Quick (fun () ->
+        let v = parse {|( (a b) (cond-expand (r7rs symbol) (else 5)))|} in
+        let actual = P.parse v in
+        let module CE = Ocaml_scheme.Cond_expand in
+        let module FR = Ocaml_scheme.Feature_query.Feature_requirement in
+        let module FI = Ocaml_scheme.Feature_query.Feature_identifier in
+        let expected =
+          Ok
+            {
+              P.Library_declaration.empty with
+              cond_expands =
+                [
+                  {
+                    CE.clauses =
+                      [
+                        {
+                          CE.Cond_expand_clause.feature_requirement = FR.feature_identifier FI.R7RS;
+                          expression = parse "symbol";
+                        };
+                      ];
+                    else_expression = Some (parse "5");
+                  };
+                ];
+              name = [ T.Symbol "a"; T.Symbol "b" ];
+            }
+        in
+        Alcotest.(check @@ result library_t error_t) "simple" expected actual);
   ]

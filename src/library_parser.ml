@@ -18,6 +18,7 @@ module Library_declaration = struct
     include_declaration : string list;
     include_ci_declaration : string list;
     include_library_declarations : string list;
+    cond_expands : Cond_expand.t list;
   }
 
   let show t =
@@ -29,8 +30,9 @@ module Library_declaration = struct
     let includes = t.include_declaration |> String.concat " " in
     let include_cis = t.include_ci_declaration |> String.concat " " in
     let include_library_declarations = t.include_library_declarations |> String.concat " " in
-    Printf.sprintf "(%s %s (begin %s) (include %s) (include-ci %s) (include-library-declarations %s))" export import
-      defs includes include_cis include_library_declarations
+    let cond_expands = List.map Cond_expand.show t.cond_expands |> String.concat " " in
+    Printf.sprintf "(%s %s (begin %s) (include %s) (include-ci %s) (include-library-declarations %s) %s)" export import
+      defs includes include_cis include_library_declarations cond_expands
 
   let pp fmt v = Format.fprintf fmt "%s" @@ show v
 
@@ -43,6 +45,7 @@ module Library_declaration = struct
       include_declaration = [];
       include_ci_declaration = [];
       include_library_declarations = [];
+      cond_expands = [];
     }
 end
 
@@ -53,6 +56,7 @@ type declaration =
   | Include                      of string list
   | Include_ci                   of string list
   | Include_library_declarations of string list
+  | Cond_expand                  of Cond_expand.t list
 
 let symbol = L.satisfy (function T.Symbol _ -> true | _ -> false)
 
@@ -159,6 +163,15 @@ let include_library_declarations =
   in
   L.nest p pair
 
+let cond_expand =
+  let open L.Let_syntax in
+  let* pair = pair in
+  let p =
+    let* cond_expand = Cond_expand_parser.cond_expand in
+    L.pure @@ Cond_expand [ cond_expand ]
+  in
+  L.nest p pair
+
 let parse v =
   let open L.Let_syntax in
   let p =
@@ -167,7 +180,7 @@ let parse v =
       L.(
         many
         @@ (export_declaration <|> import_declaration <|> begin_declaration <|> include_declaration
-          <|> include_ci_declaration <|> include_library_declarations))
+          <|> include_ci_declaration <|> include_library_declarations <|> cond_expand))
     in
 
     let declaration =
@@ -195,7 +208,8 @@ let parse v =
           | Include_ci v                   -> {
                                                 accum with
                                                 include_ci_declaration = List.concat [ accum.include_ci_declaration; v ];
-                                              })
+                                              }
+          | Cond_expand v                  -> { accum with cond_expands = List.concat [ accum.cond_expands; v ] })
         { Library_declaration.empty with name } declarations
     in
     L.pure declaration

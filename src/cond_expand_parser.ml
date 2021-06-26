@@ -107,12 +107,11 @@ let else_expression v =
   in
   p v
 
-let parse v =
+let cond_expand =
   let open L.Let_syntax in
-  let p =
-    let* _ = L.satisfy (function T.Symbol "cond-expand" -> true | _ -> false) in
-    let* clauses = L.many ce_clause in
-    let* else_expression = L.(else_expression <|> pure None) in
-    L.pure { Cond_expand.clauses; else_expression }
-  in
-  Result.map fst @@ p v
+  let* _ = L.satisfy (function T.Symbol "cond-expand" -> true | _ -> false) in
+  let* clauses = L.many ce_clause in
+  let* else_expression = L.(else_expression <|> pure None) in
+  L.pure { Cond_expand.clauses; else_expression }
+
+let parse v = Result.map fst @@ cond_expand v

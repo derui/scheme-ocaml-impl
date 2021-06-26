@@ -17,6 +17,7 @@ module Library_declaration : sig
     include_declaration : string list;
     include_ci_declaration : string list;
     include_library_declarations : string list;
+    cond_expands : Cond_expand.t list;
   }
 
   val show : t -> string
