@@ -1,5 +1,3 @@
-module T = Type
-
 (** This signature defines interface of runtime *)
 module type S = sig
   val get_library : Library.name -> Library.t option

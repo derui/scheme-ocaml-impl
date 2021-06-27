@@ -86,7 +86,7 @@ let eval_apply continuation stack =
   | _                                      -> T.raise_error @@ Printf.sprintf "need closure: %s"
                                               @@ Printer.print operator
 
-let eval ~env expr =
+let eval ~runtime ~env expr =
   let open Lib.Result.Let_syntax in
   let open Lib.Result.Infix in
   let execution_pointer = EP.make (T.cons expr T.Empty_list) in
@@ -118,7 +118,7 @@ let eval ~env expr =
     | `Call_syntax (form, arg) -> (
         match form with
         | T.S_quasiquote ->
-            let* expr = Special_form.eval_quasiquote env arg in
+            let* expr = Special_form.eval_quasiquote runtime env arg in
             let stack' = stack |> S.evaluated_values in
             let* v = E.eval ~stack:stack' ~env ~expr in
             apply_step env stack v (module E)
@@ -156,13 +156,14 @@ let eval ~env expr =
         let* evaluated = status.stack |> S.evaluated_values |> Internal_lib.reverse in
         let pop v = I.(pop_continuation instance v) |> Result.ok in
         match form with
-        | T.S_if        -> Special_form.eval_if status.env evaluated >>= pop
-        | T.S_define    -> Special_form.eval_define status.env evaluated >>= pop
-        | T.S_set_force -> Special_form.eval_set_force status.env evaluated >>= pop
-        | T.S_quote     -> Special_form.eval_quote status.env evaluated >>= pop
-        | T.S_lambda    -> Special_form.eval_lambda status.env evaluated >>= pop
-        | T.S_unquote   -> Special_form.eval_unquote status.env evaluated >>= pop
-        | _             -> T.raise_syntax_error "Invalid evaluation process")
+        | T.S_if          -> Special_form.eval_if runtime status.env evaluated >>= pop
+        | T.S_define      -> Special_form.eval_define runtime status.env evaluated >>= pop
+        | T.S_set_force   -> Special_form.eval_set_force runtime status.env evaluated >>= pop
+        | T.S_quote       -> Special_form.eval_quote runtime status.env evaluated >>= pop
+        | T.S_lambda      -> Special_form.eval_lambda runtime status.env evaluated >>= pop
+        | T.S_unquote     -> Special_form.eval_unquote runtime status.env evaluated >>= pop
+        | T.S_cond_expand -> Special_form.eval_cond_expand runtime status.env evaluated >>= pop
+        | _               -> T.raise_syntax_error "Invalid evaluation process")
     | For_expression ->
         let value = match status.stack |> S.evaluated_values with T.Cons { car = v; _ } -> v | _ as v -> v in
         I.(pop_continuation instance value) |> Result.ok
@@ -173,13 +174,14 @@ let eval ~env expr =
     let env = status.env and stack = status.stack in
     let module E =
     (val match status.Evaluation_status.evaluating_for with
-         | For_syntax T.S_if        -> (module Evaluator.Syntax_if_evaluator : Evaluator.S)
-         | For_syntax T.S_define    -> (module Evaluator.Syntax_define_evaluator : Evaluator.S)
-         | For_syntax T.S_set_force -> (module Evaluator.Syntax_set_force_evaluator : Evaluator.S)
-         | For_syntax T.S_quote     -> (module Evaluator.Syntax_quote_evaluator : Evaluator.S)
-         | For_syntax T.S_lambda    -> (module Evaluator.Syntax_quote_evaluator : Evaluator.S)
-         | For_syntax T.S_unquote   -> (module Evaluator.Syntax_quote_evaluator : Evaluator.S)
-         | _                        -> (module Evaluator.Step_evaluator : Evaluator.S))
+         | For_syntax T.S_if          -> (module Evaluator.Syntax_if_evaluator : Evaluator.S)
+         | For_syntax T.S_define      -> (module Evaluator.Syntax_define_evaluator : Evaluator.S)
+         | For_syntax T.S_set_force   -> (module Evaluator.Syntax_set_force_evaluator : Evaluator.S)
+         | For_syntax T.S_quote       -> (module Evaluator.Syntax_quote_evaluator : Evaluator.S)
+         | For_syntax T.S_lambda      -> (module Evaluator.Syntax_quote_evaluator : Evaluator.S)
+         | For_syntax T.S_unquote     -> (module Evaluator.Syntax_quote_evaluator : Evaluator.S)
+         | For_syntax T.S_cond_expand -> (module Evaluator.Syntax_quote_evaluator : Evaluator.S)
+         | _                          -> (module Evaluator.Step_evaluator : Evaluator.S))
     in
     match I.(next instance) with
     | `Finished v      ->
