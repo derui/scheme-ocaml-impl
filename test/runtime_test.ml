@@ -19,6 +19,8 @@ let tests =
           let all_list () = [ lib1 ]
 
           let produce name = List.find_opt (fun v -> L.name v = name) @@ all_list ()
+
+          let exists _ = false
         end in
         let module Q : FQ.S = struct
           let is_implemented _ = false
@@ -33,6 +35,8 @@ let tests =
           let all_list () = [ lib1 ]
 
           let produce name = List.find_opt (fun v -> L.name v = name) @@ all_list ()
+
+          let exists _ = false
         end in
         let module Q : FQ.S = struct
           let is_implemented _ = false
@@ -47,6 +51,8 @@ let tests =
           let all_list () = [ lib1 ]
 
           let produce name = List.find_opt (fun v -> L.name v = name) @@ all_list ()
+
+          let exists _ = false
         end in
         let module Q : FQ.S = struct
           let is_implemented _ = false
@@ -61,6 +67,8 @@ let tests =
           let all_list () = []
 
           let produce name = List.find_opt (fun v -> L.name v = name) @@ all_list ()
+
+          let exists _ = false
         end in
         let module Q : FQ.S = struct
           let is_implemented _ = false
@@ -76,6 +84,8 @@ let tests =
           let all_list () = [ lib1 ]
 
           let produce name = List.find_opt (fun v -> L.name v = name) @@ all_list ()
+
+          let exists _ = true
         end in
         let module Q : FQ.S = struct
           let is_implemented _ = false
@@ -91,6 +101,8 @@ let tests =
           let all_list () = [ lib1 ]
 
           let produce name = List.find_opt (fun v -> L.name v = name) @@ all_list ()
+
+          let exists _ = false
         end in
         let module Q : FQ.S = struct
           let is_implemented = function FQ.Feature_identifier.R7RS -> true | _ -> false
@@ -106,6 +118,8 @@ let tests =
           let all_list () = [ lib1 ]
 
           let produce name = List.find_opt (fun v -> L.name v = name) @@ all_list ()
+
+          let exists _ = false
         end in
         let module Q : FQ.S = struct
           let is_implemented = function FQ.Feature_identifier.R7RS | Exact_closed -> true | _ -> false
@@ -125,6 +139,8 @@ let tests =
           let all_list () = [ lib1 ]
 
           let produce name = List.find_opt (fun v -> L.name v = name) @@ all_list ()
+
+          let exists _ = false
         end in
         let module Q : FQ.S = struct
           let is_implemented = function FQ.Feature_identifier.R7RS -> true | _ -> false
@@ -144,6 +160,8 @@ let tests =
           let all_list () = [ lib1 ]
 
           let produce name = List.find_opt (fun v -> L.name v = name) @@ all_list ()
+
+          let exists _ = false
         end in
         let module Q : FQ.S = struct
           let is_implemented = function FQ.Feature_identifier.R7RS -> true | _ -> false
@@ -160,6 +178,8 @@ let tests =
           let all_list () = [ lib1 ]
 
           let produce name = List.find_opt (fun v -> L.name v = name) @@ all_list ()
+
+          let exists _ = true
         end in
         let module Q : FQ.S = struct
           let is_implemented = function FQ.Feature_identifier.R7RS -> true | _ -> false

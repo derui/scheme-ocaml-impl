@@ -1,56 +1,9 @@
 module L = List_parser
 module T = Type
-
-module Export_spec = struct
-  type t =
-    | Ident  of string
-    | Rename of string * string
-
-  let show = function Ident v -> v | Rename (v1, v2) -> Printf.sprintf "(rename %s %s)" v1 v2
-end
-
-module Library_declaration = struct
-  type t = {
-    name : T.data list;
-    export_declaration : Export_spec.t list;
-    import_declaration : Import.Import_declaration.t list;
-    begin_declaration : T.data list;
-    include_declaration : string list;
-    include_ci_declaration : string list;
-    include_library_declarations : string list;
-    cond_expands : Cond_expand.t list;
-  }
-
-  let show t =
-    let export =
-      Printf.sprintf "(export %s)" (t.export_declaration |> List.map Export_spec.show |> String.concat " ")
-    in
-    let import = t.import_declaration |> List.map Import.Import_declaration.show |> String.concat " " in
-    let defs = t.begin_declaration |> List.map Printer.print |> String.concat " " in
-    let includes = t.include_declaration |> String.concat " " in
-    let include_cis = t.include_ci_declaration |> String.concat " " in
-    let include_library_declarations = t.include_library_declarations |> String.concat " " in
-    let cond_expands = List.map Cond_expand.show t.cond_expands |> String.concat " " in
-    Printf.sprintf "(%s %s (begin %s) (include %s) (include-ci %s) (include-library-declarations %s) %s)" export import
-      defs includes include_cis include_library_declarations cond_expands
-
-  let pp fmt v = Format.fprintf fmt "%s" @@ show v
-
-  let empty =
-    {
-      name = [];
-      export_declaration = [];
-      import_declaration = [];
-      begin_declaration = [];
-      include_declaration = [];
-      include_ci_declaration = [];
-      include_library_declarations = [];
-      cond_expands = [];
-    }
-end
+module LD = Library_declaration
 
 type declaration =
-  | Export                       of Export_spec.t list
+  | Export                       of LD.Export_spec.t list
   | Import                       of Import.Import_declaration.t
   | Begin                        of T.data list
   | Include                      of string list
@@ -84,14 +37,14 @@ let export_spec =
   let open L.Let_syntax in
   let ident =
     let* v = identifier in
-    L.pure (Export_spec.Ident v)
+    L.pure (LD.Export_spec.Ident v)
   and rename =
     let* pair = pair in
     let p' =
       let* _ = L.satisfy (function T.Symbol "rename" -> true | _ -> false) in
       let* from_mame = identifier in
       let* to_name = identifier in
-      L.pure (Export_spec.Rename (from_mame, to_name))
+      L.pure (LD.Export_spec.Rename (from_mame, to_name))
     in
     L.nest p' pair
   in
@@ -121,7 +74,7 @@ let import_declaration =
   let open L.Let_syntax in
   let* pair = pair in
   let p =
-    let* import_declaration = Import.Parser.import_declaration in
+    let* import_declaration = Import_parser.import_declaration in
     L.pure (Import import_declaration)
   in
   L.nest p pair
@@ -189,25 +142,26 @@ let parse v =
           match v with
           | Begin v                        -> {
                                                 accum with
-                                                begin_declaration = List.concat [ accum.begin_declaration; v ];
+                                                begin_declarations = List.concat [ accum.begin_declarations; v ];
                                               }
           | Export v                       -> {
                                                 accum with
-                                                export_declaration = List.concat [ accum.export_declaration; v ];
+                                                export_declarations = List.concat [ accum.export_declarations; v ];
                                               }
           | Import v                       -> {
                                                 accum with
-                                                import_declaration = List.concat [ accum.import_declaration; [ v ] ];
+                                                import_declarations = List.concat [ accum.import_declarations; [ v ] ];
                                               }
           | Include v                      -> {
                                                 accum with
-                                                include_declaration = List.concat [ accum.include_declaration; v ];
+                                                include_declarations = List.concat [ accum.include_declarations; v ];
                                               }
           | Include_library_declarations v ->
               { accum with include_library_declarations = List.concat [ accum.include_library_declarations; v ] }
           | Include_ci v                   -> {
                                                 accum with
-                                                include_ci_declaration = List.concat [ accum.include_ci_declaration; v ];
+                                                include_ci_declarations =
+                                                  List.concat [ accum.include_ci_declarations; v ];
                                               }
           | Cond_expand v                  -> { accum with cond_expands = List.concat [ accum.cond_expands; v ] })
         { Library_declaration.empty with name } declarations

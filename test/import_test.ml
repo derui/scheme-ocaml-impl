@@ -1,6 +1,8 @@
-module P = Ocaml_scheme.Import.Parser
+module L = Ocaml_scheme.Library
 module I = Ocaml_scheme.Import
 module T = Ocaml_scheme.Type
+module R = Ocaml_scheme.Runtime
+module Env = Ocaml_scheme.Environment
 module Pr = Ocaml_scheme.Printer
 
 let exp_pp = Alcotest.testable Pr.pp ( = )
@@ -13,63 +15,56 @@ let parse v = Lexing.from_string v |> Ocaml_scheme.Parser.program Ocaml_scheme.L
 
 let list_to_scheme_list v = List.rev v |> List.fold_left (fun accum v -> T.cons v accum) T.Empty_list
 
-let parser_tests =
+let tests =
+  let library =
+    L.make [ "name" ]
+    |> L.define ~symbol:"bool" ~data:T.True |> L.export ~symbol:"bool"
+    |> L.define ~symbol:"number" ~data:(T.Number "15")
+    |> L.export ~symbol:"number"
+  in
+  let module Runtime : R.S = struct
+    let get_library _ = Some library
+
+    let define_library _ = failwith "not implemented"
+
+    let is_requirement_filled _ = true
+  end in
   [
-    Alcotest.test_case "Import parser: parse empty declaration" `Quick (fun () ->
-        let v = parse "(import)" in
-        let actual = P.parse v in
-        let expected = Ok { I.Import_declaration.import_sets = [] } in
-        Alcotest.(check @@ result import_set_t error_t) "simple" expected actual);
-    Alcotest.test_case "Import parser: parse 'only' declaration" `Quick (fun () ->
-        let v = parse "(import (only (foo) a b c))" in
-        let actual = P.parse v in
-        let expected = Ok { I.Import_declaration.import_sets = [ Only (Library_name [ "foo" ], [ "a"; "b"; "c" ]) ] } in
-        Alcotest.(check @@ result import_set_t error_t) "simple" expected actual);
-    Alcotest.test_case "Import parser: parse 'except' declaration" `Quick (fun () ->
-        let v = parse "(import (except (foo bar) a b c))" in
-        let actual = P.parse v in
-        let expected =
-          Ok { I.Import_declaration.import_sets = [ Except (Library_name [ "foo"; "bar" ], [ "a"; "b"; "c" ]) ] }
-        in
-        Alcotest.(check @@ result import_set_t error_t) "simple" expected actual);
-    Alcotest.test_case "Import parser: parse 'prefix' declaration" `Quick (fun () ->
-        let v = parse "(import (prefix (foo bar) pre-))" in
-        let actual = P.parse v in
-        let expected = Ok { I.Import_declaration.import_sets = [ Prefix (Library_name [ "foo"; "bar" ], "pre-") ] } in
-        Alcotest.(check @@ result import_set_t error_t) "simple" expected actual);
-    Alcotest.test_case "Import parser: parse 'rename' declaration" `Quick (fun () ->
-        let v = parse "(import (rename (foo bar) (a b) (c d)))" in
-        let actual = P.parse v in
-        let expected =
-          Ok
+    Alcotest.test_case "import all symbols from library" `Quick (fun () ->
+        let import_decl = I.Import_declaration.{ import_sets = [ I.Import_set.Library_name [ "name" ] ] } in
+        let env = I.import ~env:(Env.make []) ~runtime:(module Runtime) ~declaration:import_decl |> Result.get_ok in
+        let actual = Env.get env ~key:"bool" in
+        let expected = Some T.True in
+        Alcotest.(check @@ option exp_pp) "bool" expected actual);
+    Alcotest.test_case "do not import symbol not exported from library" `Quick (fun () ->
+        let import_decl = I.Import_declaration.{ import_sets = [ I.Import_set.Library_name [ "name" ] ] } in
+        let env = I.import ~env:(Env.make []) ~runtime:(module Runtime) ~declaration:import_decl |> Result.get_ok in
+        let actual = Env.get env ~key:"not-found" in
+        let expected = None in
+        Alcotest.(check @@ option exp_pp) "not found" expected actual);
+    Alcotest.test_case "renamed import " `Quick (fun () ->
+        let import_decl =
+          I.Import_declaration.
             {
-              I.Import_declaration.import_sets =
+              import_sets =
                 [
-                  Rename
-                    ( Library_name [ "foo"; "bar" ],
-                      [ { from_name = "a"; to_name = "b" }; { from_name = "c"; to_name = "d" } ] );
+                  I.Import_set.(Rename (Library_name [ "name" ], [ { from_name = "bool"; to_name = "renamed-bool" } ]));
                 ];
             }
         in
-        Alcotest.(check @@ result import_set_t error_t) "simple" expected actual);
-    Alcotest.test_case "Import parser: parse simple library name declaration" `Quick (fun () ->
-        let v = parse "(import (only except library name))" in
-        let actual = P.parse v in
-        let expected =
-          Ok { I.Import_declaration.import_sets = [ Library_name [ "only"; "except"; "library"; "name" ] ] }
+        let env = I.import ~env:(Env.make []) ~runtime:(module Runtime) ~declaration:import_decl |> Result.get_ok in
+        let actual = Env.get env ~key:"renamed-bool" in
+        let expected = Some T.True in
+        Alcotest.(check @@ option exp_pp) "not found" expected actual);
+    Alcotest.test_case "import only specified symbols" `Quick (fun () ->
+        let import_decl =
+          I.Import_declaration.{ import_sets = [ I.Import_set.(Only (Library_name [ "name" ], [ "bool" ])) ] }
         in
-        Alcotest.(check @@ result import_set_t error_t) "simple" expected actual);
-    Alcotest.test_case "Import parser: parse multiple declarations" `Quick (fun () ->
-        let v = parse "(import (library name) (only (foo) test))" in
-        let actual = P.parse v in
-        let expected =
-          Ok
-            {
-              I.Import_declaration.import_sets =
-                [ Library_name [ "library"; "name" ]; Only (Library_name [ "foo" ], [ "test" ]) ];
-            }
-        in
-        Alcotest.(check @@ result import_set_t error_t) "simple" expected actual);
+        let env = I.import ~env:(Env.make []) ~runtime:(module Runtime) ~declaration:import_decl |> Result.get_ok in
+        let actual = Env.get env ~key:"bool" in
+        let expected = Some T.True in
+        Alcotest.(check @@ option exp_pp) "not found" expected actual;
+        let actual = Env.get env ~key:"number" in
+        let expected = None in
+        Alcotest.(check @@ option exp_pp) "not found" expected actual);
   ]
-
-let tests = parser_tests

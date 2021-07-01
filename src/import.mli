@@ -24,11 +24,9 @@ module Import_declaration : sig
   val pp : Format.formatter -> t -> unit
 end
 
-(** import declaration parser *)
-module Parser : sig
-  val import_declaration : Import_declaration.t List_parser.t
-  (** combinator for import declaration *)
-
-  val parse : Type.data -> Import_declaration.t Type.evaluation_result
-  (** Parse a list as import declaration *)
-end
+val import :
+  env:Type.data Environment.t ->
+  declaration:Import_declaration.t ->
+  runtime:(module Runtime.S) ->
+  Type.data Environment.t Type.evaluation_result
+(** [import ~env ~declaration ~runtime] import library from [runtime] into [env] declared by [declaration] *)

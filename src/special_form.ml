@@ -133,18 +133,11 @@ let eval_quote : special_form =
 let eval_cond_expand : special_form =
  fun (module R : Runtime.S) _ v ->
   match v with
-  | T.Cons _ -> (
+  | T.Cons _ ->
       let open Lib.Result.Let_syntax in
       let* cond_expand = Cond_expand_parser.parse (T.cons (T.Symbol "cond-expand") v) in
-      let module Q = Feature_query in
-      let clause =
-        List.find_opt
-          (fun clause -> R.is_requirement_filled clause.Cond_expand.Cond_expand_clause.feature_requirement)
-          cond_expand.clauses
-      in
-      match clause with
-      | None        -> Option.value ~default:T.Undef cond_expand.else_expression |> Result.ok
-      | Some clause -> Ok clause.expression)
+      let ret = Cond_expand.eval cond_expand ~runtime:(module R) in
+      Option.value ~default:T.Undef ret |> Result.ok
   | _        ->
       T.raise_syntax_error
       @@ Printf.sprintf "malformed cond-expand: %s"

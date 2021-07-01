@@ -26,3 +26,11 @@ let show v =
 let pp fmt v = Format.fprintf fmt "%s" @@ show v
 
 let empty = { clauses = []; else_expression = None }
+
+(** [eval cond_expand ~runtime] expand a cond-expand with [runtime] *)
+let eval t ~runtime:(module R : Runtime.S) =
+  let module Q = Feature_query in
+  let clause =
+    List.find_opt (fun clause -> R.is_requirement_filled clause.Cond_expand_clause.feature_requirement) t.clauses
+  in
+  match clause with None -> t.else_expression | Some clause -> Some clause.expression

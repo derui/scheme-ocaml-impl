@@ -36,98 +36,82 @@ module Import_declaration = struct
   let pp fmt v = Format.fprintf fmt "%s" @@ show v
 end
 
-module Parser = struct
-  module L = List_parser
-  module T = Type
+module T = Type
 
-  let symbol = L.satisfy (function T.Symbol _ -> true | _ -> false)
+module Key_set = Set.Make (struct
+  type t = string
 
-  let pair = L.satisfy (function T.Cons _ -> true | _ -> false)
+  let compare = Stdlib.compare
+end)
 
-  let identifiers =
-    let open L.Infix in
-    let to_list v =
-      List.fold_left (fun accum v -> match v with T.Symbol ident -> ident :: accum | _ -> accum) [] v |> List.rev
-    in
-    to_list <$> L.many1 symbol
+module Key_map = Map.Make (struct
+  type t = string
 
-  let rec import_set v =
-    let open L.Infix in
-    let open L.Let_syntax in
-    let only v =
-      let p =
-        let* pair = pair in
-        let p' =
-          let* _ = L.satisfy (function T.Symbol "only" -> true | _ -> false) in
-          let* set = import_set in
-          let* identifiers = identifiers in
-          L.pure (Import_set.Only (set, identifiers))
+  let compare = Stdlib.compare
+end)
+
+let import ~env ~declaration ~runtime:(module R : Runtime.S) =
+  let import_sets = declaration.Import_declaration.import_sets in
+
+  let rec import' = function
+    | Import_set.Library_name name          -> (
+        let library = R.get_library name in
+        match library with
+        | None         -> T.raise_error "Do not found library"
+        | Some library -> Library.as_environment library |> Result.ok)
+    | Import_set.Only (set, symbols)        ->
+        let open Lib.Result.Let_syntax in
+        let* env' = import' set in
+        let new_env = Environment.make [] in
+        List.iter
+          (fun symbol ->
+            Environment.get env' ~key:symbol |> Option.iter (fun v -> Environment.set new_env ~key:symbol ~v |> ignore))
+          symbols;
+        Ok new_env
+    | Import_set.Except (set, symbols)      ->
+        let open Lib.Result.Let_syntax in
+        let* env' = import' set in
+        let new_env = Environment.make [] in
+        let except_keys = Key_set.of_list symbols and new_env_keys = Key_set.of_list @@ Environment.keys env' in
+        let target_keys = Key_set.diff new_env_keys except_keys in
+        Key_set.iter
+          (fun symbol ->
+            Environment.get env' ~key:symbol |> Option.iter (fun v -> Environment.set new_env ~key:symbol ~v |> ignore))
+          target_keys;
+        Ok new_env
+    | Import_set.Prefix (set, prefix)       ->
+        let open Lib.Result.Let_syntax in
+        let* env' = import' set in
+        let new_env = Environment.make [] in
+        Environment.keys env'
+        |> List.iter (fun symbol ->
+               let new_key = prefix ^ symbol in
+
+               Environment.get env' ~key:symbol
+               |> Option.iter (fun v -> Environment.set new_env ~key:new_key ~v |> ignore));
+        Ok new_env
+    | Import_set.Rename (set, rename_pairs) ->
+        let open Lib.Result.Let_syntax in
+        let* env' = import' set in
+
+        let new_env = Environment.make [] in
+        let rename_map =
+          List.map (fun v -> (v.Import_set.from_name, v.to_name)) rename_pairs |> List.to_seq |> Key_map.of_seq
         in
-        fun _ -> p' pair
-      in
-      p v
-    and except v =
-      let open L.Let_syntax in
-      let p =
-        let* pair = pair in
-        let p' =
-          let* _ = L.satisfy (function T.Symbol "except" -> true | _ -> false) in
-          let* set = import_set in
-          let* identifiers = identifiers in
-          L.pure (Import_set.Except (set, identifiers))
-        in
-        fun _ -> p' pair
-      in
-      p v
-    and prefix v =
-      let open L.Let_syntax in
-      let p =
-        let* pair = pair in
-        let p' =
-          let* _ = L.satisfy (function T.Symbol "prefix" -> true | _ -> false) in
-          let* set = import_set in
-          let* identifier = (function T.Symbol v -> v | _ -> failwith "Invalid path") <$> symbol in
-          L.pure (Import_set.Prefix (set, identifier))
-        in
-        fun _ -> p' pair
-      in
-      p v
-    and rename v =
-      let open L.Let_syntax in
-      let p =
-        let* element = pair in
+        Environment.keys env'
+        |> List.iter (fun symbol ->
+               let key = Key_map.find_opt symbol rename_map |> Option.value ~default:symbol in
 
-        let p' =
-          let* _ = L.satisfy (function T.Symbol "rename" -> true | _ -> false) in
-          let* set = import_set in
-          let* renames =
-            List.map (function
-              | T.Cons { car = T.Symbol from; cdr = T.Cons { car = T.Symbol to_name; cdr = T.Empty_list } } ->
-                  { Import_set.from_name = from; to_name }
-              | _ -> failwith "Invalid path")
-            <$> L.many1 pair
-          in
-          L.pure (Import_set.Rename (set, renames))
-        in
-        fun _ -> p' element
-      in
-      p v
-    and library_name v =
-      let open L.Let_syntax in
-      let open L.Infix in
-      let p =
-        let* library_name, _ = Internal_lib.scheme_list_to_list <$> pair in
-        L.pure (Import_set.Library_name (List.filter_map (function T.Symbol v -> Some v | _ -> None) library_name))
-      in
-      p v
-    in
-    L.(only <|> except <|> prefix <|> rename <|> library_name) v
+               Environment.get env' ~key:symbol |> Option.iter (fun v -> Environment.set new_env ~key ~v |> ignore));
+        Ok new_env
+  in
 
-  let import_declaration =
-    let open L.Let_syntax in
-    let* _ = L.satisfy (function T.Symbol "import" -> true | _ -> false) in
-    let* import_sets = L.many import_set in
-    L.pure { Import_declaration.import_sets }
-
-  let parse v = Result.map fst @@ import_declaration v
-end
+  List.fold_left
+    (fun accum import_set ->
+      match accum with
+      | Error _ -> accum
+      | Ok env  ->
+          let open Lib.Result.Let_syntax in
+          let* env' = import' import_set in
+          Environment.merge ~base:env ~other:env' |> Result.ok)
+    (Ok env) import_sets
