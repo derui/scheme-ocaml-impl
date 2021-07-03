@@ -14,6 +14,12 @@ let tests =
     ("Execution pointer", Execution_pointer_test.tests);
     ("Primitive operations", Primitive_op_test.tests);
     ("Library", Library_test.tests);
+    ("List parser", List_parser_test.tests);
+    ("Import", Import_test.tests);
+    ("Import parser", Import_parser_test.tests);
+    ("Library parser", Library_parser_test.tests);
+    ("Runtime", Runtime_test.tests);
+    ("cond-expand parser", Cond_expand_parser_test.tests);
   ]
 
 let () = Alcotest.run "OCaml scheme learning" tests

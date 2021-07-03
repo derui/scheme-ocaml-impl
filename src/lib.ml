@@ -35,3 +35,15 @@ module Option = struct
     let ( and* ) = bind
   end
 end
+
+module File = struct
+  let with_channel filename ~f =
+    let chan = open_in filename in
+    try
+      let ret = f chan in
+      close_in chan;
+      ret
+    with e ->
+      close_in chan;
+      raise e
+end

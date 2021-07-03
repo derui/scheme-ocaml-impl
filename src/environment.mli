@@ -12,3 +12,11 @@ val replace : 'a t -> key:string -> v:'a -> unit option
 
 val get : 'a t -> key:string -> 'a option
 (** [get t ~key] get the binding that bounded by [key]. If [key] is not defined in whole environment, return None. *)
+
+val merge : base:'a t -> other:'a t -> 'a t
+(** [merge ~base ~other] merge [other] environment into [base] environment. An environment returned is modified [base].
+    [other] is not modified. *)
+
+val keys : 'a t -> string list
+(** [keys t] return all keys defined in environment [t]. Keys returned from this function contains keys in parent
+    environment *)

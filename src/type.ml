@@ -38,6 +38,7 @@ and special_form =
   | S_unquote
   | S_unquote_splicing
   | S_quasiquote
+  | S_cond_expand
 
 and macro_fun = scheme_fun
 
